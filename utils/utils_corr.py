@@ -107,13 +107,14 @@ def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None):
                 print("some voxels not in mask")
         else:
             vox_in_mask = np.ones(ijk_roi.shape[1]).astype('bool')
-        
-        signals[roi_name] = (img4d.get_data()[ijk_roi[0][vox_in_mask], 
+
+        nvox = vox_in_mask.sum() # number of True
+        signals[roi_name] = ((img4d.get_data()[ijk_roi[0][vox_in_mask], 
                                               ijk_roi[1][vox_in_mask], 
-                                              ijk_roi[2][vox_in_mask], :]).mean(axis=0)
+                                              ijk_roi[2][vox_in_mask], :]).mean(axis=0), nvox)
         
     return signals
-
+        
 
 def xyz_affine(big_aff, xyz=[0,1,2], debug=0):
     """
