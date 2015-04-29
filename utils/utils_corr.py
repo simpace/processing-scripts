@@ -1,27 +1,28 @@
 from __future__ import print_function
 import nibabel as nib
 import numpy as np
-import os
 import os.path as osp
-import matplotlib.pyplot as plt
-import nipy
-import json
+import glob as gb
 import scipy.linalg as lin
-from warnings import warn
+from six import string_types
 
-from numpy.testing import (assert_array_almost_equal, assert_almost_equal, assert_array_equal, assert_equal)
+# import matplotlib.pyplot as plt
+# import nipy
+# import json
+# from warnings import warn
+# from numpy.testing import (assert_array_almost_equal, assert_almost_equal, \
+#                               assert_array_equal, assert_equal)
 
-
-
-# assume both in MNI space - resample 
-from nipy.algorithms.resample import resample_img2img, resample
-import nipy.core.api as capi # vox2mni
-from nipy.core.image import image
+#---  assume both in MNI space - resample 
+# import nipy.core.api as capi # vox2mni
+# from nipy.core.image import image
+from nipy.algorithms.resample import resample # ,resample_img2img 
 from nipy.core.reference import coordinate_map as cmap
 from nipy.core.reference.coordinate_system import CoordSysMaker
+from nipy.labs.mask import compute_mask #, compute_mask_files
 
 
-def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None):
+def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None, minvox=1):
     """
     Extract signals from list of 4d nifti
     
@@ -31,13 +32,14 @@ def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None):
     roi_prefix: str
     fn_img4d: str
     mask: str or nibabel image
+    minvox: minimum number of voxel in sampled region
     """
     
     IMGDIM = 3
     TINY = np.finfo('float').eps * 1000
     
     img4d = nib.load(fn_img4d)
-    aff_img = ucr.xyz_affine(img4d.get_affine(), xyz=[0,1,2])
+    aff_img = xyz_affine(img4d.get_affine(), xyz=[0,1,2])
     
     # 1- Check roi affine are all the same
     aal_files = gb.glob(osp.join(rois_dir, roi_prefix))
@@ -70,8 +72,8 @@ def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None):
     if mask != None:
         if isinstance(mask, string_types):
             data_mask = nib.load(mask).get_data()
-        elif hasattr(mask, get_data):
-            data_mask = img_mask.get_data()
+        elif hasattr(mask, 'get_data'):
+            data_mask = mask.get_data()
         else:
             data_mask = np.asarray(mask)
         data_mask = data_mask.astype('bool')
@@ -81,39 +83,44 @@ def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None):
     signals = {}
     issues = {}
     for roi_name, roi in roi_imgs.iteritems():
-        print(roi_name)
+        issues[roi_name] = False
         ijk_roi = np.asarray(np.where(roi.get_data().astype('bool')))
     
         if translate:
             ijk_roi += translation
         
-        print(ijk_roi.min(axis=1), ijk_roi.max(axis=1))
         ## is this translation ok with the shape of the image to sample from?
         img3dshape = np.asarray(img4d.shape)[:IMGDIM].reshape(IMGDIM,1)
-        print(img3dshape)
+        # print(img3dshape)
         
         if not (np.all(ijk_roi >= 0) and np.all((img3dshape - ijk_roi) > 0)):
-            print("could not sample roi :", roi_name)
+            print("could not sample all roi :", roi_name)
+            print(ijk_roi.min(axis=1), ijk_roi.max(axis=1))
             signals[roi_name] = None
             issues[roi_name] = 'ijk_roi out of image shape'
             continue
             
-        # see if all ijk are within the mask?
+        # see if all ijk are within the mask? if not, sample region on mask
         if mask != None:
             # not all voxels in the mask ? 
             vox_in_mask = np.all(data_mask[ijk_roi], axis=0)
             if not np.all(data_mask[ijk_roi]):
-                issues[roi_name] = ('not all voxels in mask', len(vox_in_mask==True))
+                issues[roi_name] = ('not all voxels in mask', vox_in_mask.sum())
                 print("some voxels not in mask")
         else:
             vox_in_mask = np.ones(ijk_roi.shape[1]).astype('bool')
 
-        nvox = vox_in_mask.sum() # number of True
+        nvox = vox_in_mask.sum() # number of True == number of voxels in mask
+        if nvox < minvox:
+            signals[roi_name] = None
+            issues[roi_name] = ('less than minvox = {:d} in roi'.format(minvox), nvox)
+            continue
+        
         signals[roi_name] = ((img4d.get_data()[ijk_roi[0][vox_in_mask], 
                                               ijk_roi[1][vox_in_mask], 
                                               ijk_roi[2][vox_in_mask], :]).mean(axis=0), nvox)
         
-    return signals
+    return signals, issues
         
 
 def xyz_affine(big_aff, xyz=[0,1,2], debug=0):
@@ -165,7 +172,6 @@ def ioflab(l,labels):
 
 
 
-from nipy.labs.mask import compute_mask #, compute_mask_files
 
 def inter_run_mask(fnames, hist_m=.3, hist_M=.8):
     """
