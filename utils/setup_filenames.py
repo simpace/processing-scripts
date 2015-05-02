@@ -1,7 +1,7 @@
 """Script to setup dicom directories to standard format
 """
 
-import os, sys
+import os, sys, stat
 import numpy as np
 import re
 import json
@@ -15,6 +15,32 @@ import nipype.interfaces.matlab as matlab
 #-----------------------------------------------------------------------------
 # Functions
 #-----------------------------------------------------------------------------
+def isgroup_readable(filepath):
+  st = os.stat(filepath)
+  return bool(st.st_mode & stat.S_IRGRP)
+
+def isgroup_writeable(filepath):
+  st = os.stat(filepath)
+  return bool(st.st_mode & stat.S_IWGRP)
+
+def isgroup_executeable(filepath):
+  st = os.stat(filepath)
+  return bool(st.st_mode & stat.S_IXGRP)
+
+def isuser_readable(filepath):
+  st = os.stat(filepath)
+  return bool(st.st_mode & stat.S_IRUSR)
+
+def isuser_writeable(filepath):
+  st = os.stat(filepath)
+  return bool(st.st_mode & stat.S_IWUSR)
+
+def isuser_executeable(filepath):
+  st = os.stat(filepath)
+  return bool(st.st_mode & stat.S_IXUSR)
+
+
+
 def sort_ctime(file_list):
     """This function takes in a list of files and returns a sorted list of them 
     by their creation time"""
@@ -174,11 +200,17 @@ def main(argv = sys.argv):
         
         #rm the directory and contents if it already exists
         if os.path.exists(out_dir):
-            shutil.rmtree(out_dir)
+            try:
+                shutil.rmtree(out_dir)
+            except:
+                print "cannot remove " + out_dir
 
         #only run if this directory does not exist yet
         if not os.path.exists(out_dir):
-            os.makedirs(out_dir) 
+            try:
+                os.makedirs(out_dir, 0o770) 
+            except:
+                print "cannot make " + out_dir
 
         #get the two files for each motion type
         none_dirs = glob(pjoin(sess,'*/Danzone_Testing*/ep2d_simpace_NONE*'))
@@ -204,21 +236,34 @@ def main(argv = sys.argv):
             new_runname = pjoin(out_dir,new_fname)
             new_dcmdir = pjoin(new_runname,'dicoms')
 
+            #check that I can write in these directory
+            if not (isuser_writeable(new_runname) and isuser_executeable(new_runname)):
+                # attempt to change permissions
+                os.chmod(new_runname, 0o770)
+            #check that I can write in these directory
+            if not (isuser_writeable(new_dcmdir) and isuser_executeable(new_dcmdir)):
+                # attempt to change permissions
+                os.chmod(new_dcmdir, 0o770)
+
             #copy dir with the new name
             shutil.copytree(runname,new_dcmdir)
 
-            #move the first four dcms to a new dir
             init_dcmdir = pjoin(new_dcmdir,'first_vols')
             if not os.path.exists(init_dcmdir):
-                os.makedirs(init_dcmdir)
+                try:
+                    os.makedirs(init_dcmdir, 0o770)
+                except:
+                    print "cannot create 'first_vols' in " + new_dcmdir
+                    raise
 
+            #move the first four dcms to a new dir
             move_first_vols(new_dcmdir,init_dcmdir,numvols=numvols)
             
             #do dicom conversion
             #first create a nifti directory
             nii_dir = pjoin(new_runname,'data')
             if not os.path.exists(nii_dir):
-                os.makedirs(nii_dir)
+                os.makedirs(nii_dir, 0o770)
             dcm_files = sorted(glob(pjoin(new_dcmdir,'*.dcm')))
             dicom_convert.inputs.in_files = dcm_files
             dicom_convert.inputs.output_dir = nii_dir

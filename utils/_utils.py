@@ -5,6 +5,7 @@ import os.path as osp
 import glob as gb
 import scipy.linalg as lin
 from six import string_types
+from collections import OrderedDict
 
 # import matplotlib.pyplot as plt
 # import nipy
@@ -21,7 +22,124 @@ from nipy.core.reference import coordinate_map as cmap
 from nipy.core.reference.coordinate_system import CoordSysMaker
 from nipy.labs.mask import compute_mask #, compute_mask_files
 
+TINY = np.finfo('float').eps * 1000
 
+def project_filter(data, bandf, dt):
+    """
+    bandf : list or tuple
+        [lowfreq, highfreq]
+    """
+    nt = data.shape[0]
+    lowf = bandf[0]
+    higf = bandf[1]
+    tim = np.linspace(0, (nt-1)*dt, nt)
+    #cosBF = dm._cosine_drift(1./lowf, frametimes)
+    #cosBF = np.loadtxt('./dctmtx_114_114.txt')
+    cosBF = _cosine_drift((2*dt), tim)
+    #print(cosBF.shape)
+    
+    #order_h = int(np.floor(2*T) * higf)
+    #order_l = int(np.floor(2*T) * lowf)
+    order_h = int(np.floor(2*nt*higf*dt))
+    order_l = int(np.floor(2*nt*lowf*dt))
+    print(order_h, order_l)
+    
+    if order_h == 0:
+        XBF = cosBF[:,:order_l]
+    elif order_l == 0:
+        XBF = cosBF[:,order_h:]
+    else:
+        XBF = np.hstack((cosBF[:,:order_l], cosBF[:,order_h:]))
+    
+    return R_proj(XBF, data)
+
+
+def _create_bandpass_bf(npoint, dt, bandf, exclude=False):
+    """
+    npoint: int
+        number of points in data to be filtered (ie. time dimension)
+    bandf : list or tuple
+        [lowfreq, highfreq]
+    dt: number 
+        the sampling time in seconds, eg. 2.4
+    exclude: bool
+        True will return basis functions between lowf and highf
+        False will return bf between [0,lowf] and [higf,1/dt]
+    """
+    
+    nt = npoint
+    lowf = bandf[0]
+    higf = bandf[1]
+    tim = np.linspace(0, (nt-1)*dt, nt)
+    cosBF = _cosine_drift((2*dt), tim)
+    
+    order_h = int(np.floor(2*nt*higf*dt))
+    order_l = int(np.floor(2*nt*lowf*dt))
+    # for debug: 
+    # print(order_h, order_l)
+
+    if lowf >= higf:
+        raise(ValueError, (lowf, higf))
+
+    # check at least one order positive
+    if (order_h == 0) and (order_l == 0):
+        raise(ValueError, (order_h, order_l))
+
+
+    if order_h == 0:
+        XBF = cosBF[:,:order_l]
+    elif order_l == 0:
+        XBF = cosBF[:,order_h:]
+    else:
+        XBF = np.hstack((cosBF[:,:order_l], cosBF[:,order_h:]))
+    
+    return XBF, (order_h, order_l)
+
+
+
+
+
+#- in the future : replace this by import the right version of nipy -#
+def _cosine_drift(period_cut, frametimes):
+    """Create a cosine drift matrix with periods greater or equals to period_cut
+
+    Parameters
+    ----------
+    period_cut: float 
+         Cut period of the low-pass filter (in sec)
+    frametimes: array of shape(nscans)
+         The sampling times (in sec)
+
+    Returns
+    -------
+    cdrift:  array of shape(n_scans, n_drifts)
+             cosin drifts plus a constant regressor at cdrift[:,0]
+
+    Ref: http://en.wikipedia.org/wiki/Discrete_cosine_transform DCT-II
+    """
+    len_tim = len(frametimes)
+    n_times = np.arange(len_tim)
+    hfcut = 1./ period_cut # input parameter is the period  
+
+    dt = frametimes[1] - frametimes[0] # frametimes.max() should be (len_tim-1)*dt    
+    order = int(np.floor(2*len_tim*hfcut*dt)) # s.t. hfcut = 1/(2*dt) yields len_tim
+    cdrift = np.zeros((len_tim, order))
+    nfct = np.sqrt(2.0/len_tim)
+    
+    for k in range(1, order):
+        cdrift[:,k-1] = nfct * np.cos((np.pi/len_tim)*(n_times + .5)*k)
+    
+    cdrift[:,order-1] = 1. # or 1./sqrt(len_tim) to normalize
+    return cdrift
+
+
+#- use nilearn to get to get the rois and check all affines are the same
+
+#- get  4d image - return array? iterator over nibabel images? 
+
+#-----------------------------------------------------------------------------#
+#-  This function should be a wrapper over nilearn stuff -#
+#-----------------------------------------------------------------------------#
 def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None, minvox=1):
     """
     Extract signals from list of 4d nifti
@@ -36,15 +154,13 @@ def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None, minvox=1):
     """
     
     IMGDIM = 3
-    TINY = np.finfo('float').eps * 1000
-    
     img4d = nib.load(fn_img4d)
     aff_img = xyz_affine(img4d.get_affine(), xyz=[0,1,2])
     
     # 1- Check roi affine are all the same
-    aal_files = gb.glob(osp.join(rois_dir, roi_prefix))
+    roi_files = gb.glob(osp.join(rois_dir, roi_prefix))
     roi_imgs = {}
-    for fn in aal_files:
+    for fn in roi_files:
         roi_imgs[fn] = nib.load(fn)
     roi_affs = np.asarray([img.get_affine()[:IMGDIM,:IMGDIM] for img in roi_imgs.values()])
     aff_roi = roi_affs[0].copy()
@@ -123,11 +239,50 @@ def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None, minvox=1):
     return signals, issues
         
 
+def _dict_signals_to_arr(dsig):
+    """
+    Take a signal dictionary and turn the not None values into numpy array
+    """
+    _keys = dsig.keys()
+    _keys = tuple([ k for k in _keys if dsig[k] != None ])
+    t = len(dsig[_keys[0]][0])
+    n = len(_keys)
+    arr = np.zeros((t, n), dtype='float')
+    for idx, k in enumerate(_keys):
+        arr[:,idx] = dsig[k][0]
+
+    return (arr, _keys)
+
+
+#----------------------------------------------------------------------------#
+# A list of functions that return a bool array with True where signal ok
+# all have inputs arr
+#----------------------------------------------------------------------------#
+def _var_not_zero(arr):
+    """
+    check that variance of signal is strong enough
+    """
+    return np.var(arr, axis=0) > TINY 
+
+
+def _check_roi_signals(arr, kkeys, check_funcs = [_var_not_zero]):
+    """
+    logical and with all functions in check_funcs
+    """
+    kkeys = np.asarray(kkeys)
+    goods = np.ones((len(kkeys),),dtype='bool',)
+    for func in check_funcs:
+        goods = np.logical_and(goods, func(arr))
+
+    return arr[:,goods], kkeys[goods] 
+
+
+
 def xyz_affine(big_aff, xyz=[0,1,2], debug=0):
     """
     take a big affine, 
     and returns the affine constructed with the indices xyz
-    future : could extend to make it return a bigger affine than input aff (big_aff)
+    could be extended to make it return a bigger affine than input big_aff
     """
     
     tmp = big_aff[xyz,:][:,xyz]
