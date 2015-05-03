@@ -9,37 +9,66 @@ from glob import glob
 from os.path import join as pjoin
 import dicom
 import shutil
+import tempfile
 import nipype.interfaces.spm.utils as spmu
 import nipype.interfaces.matlab as matlab
 
 #-----------------------------------------------------------------------------
 # Functions
 #-----------------------------------------------------------------------------
+
 def isgroup_readable(filepath):
-  st = os.stat(filepath)
-  return bool(st.st_mode & stat.S_IRGRP)
+    st = os.stat(filepath)
+    return bool(st.st_mode & stat.S_IRGRP)
 
 def isgroup_writeable(filepath):
-  st = os.stat(filepath)
-  return bool(st.st_mode & stat.S_IWGRP)
+    st = os.stat(filepath)
+    return bool(st.st_mode & stat.S_IWGRP)
 
 def isgroup_executeable(filepath):
-  st = os.stat(filepath)
-  return bool(st.st_mode & stat.S_IXGRP)
+    st = os.stat(filepath)
+    return bool(st.st_mode & stat.S_IXGRP)
 
 def isuser_readable(filepath):
-  st = os.stat(filepath)
-  return bool(st.st_mode & stat.S_IRUSR)
+    st = os.stat(filepath)
+    return bool(st.st_mode & stat.S_IRUSR)
 
 def isuser_writeable(filepath):
-  st = os.stat(filepath)
-  return bool(st.st_mode & stat.S_IWUSR)
+    st = os.stat(filepath)
+    return bool(st.st_mode & stat.S_IWUSR)
 
 def isuser_executeable(filepath):
-  st = os.stat(filepath)
-  return bool(st.st_mode & stat.S_IXUSR)
+    st = os.stat(filepath)
+    return bool(st.st_mode & stat.S_IXUSR)
 
+def check_dir(filepath, checklist=['exists']):
+    """
+    check that directory has the attribute in checklist
+    parameters:
+    -----------
+    filename: string
+        the filepath
+    checklist: list of string
+        with all the check to be performed
+        ['exists', 'iswritable']
+    returns:
+    -------
+    bool 
+        a boolean if all checklist conditions are true
+    """
+    checkbool = True
+    for chck in checklist:
+        if chck == 'exists':
+            checkbool = checkbool and os.path.isdir(filepath)
+        elif chck == 'iswriteable':
+            # try to write in that directory
+            try:
+                temp = tempfile.TemporaryFile(mode='w+b', dir=filepath)
+                temp.close()
+            except:
+                checkbool = False
 
+    return checkbool
 
 def sort_ctime(file_list):
     """This function takes in a list of files and returns a sorted list of them 
@@ -180,12 +209,24 @@ def move_first_vols(new_dcmdir,init_dcmdir,numvols=4):
 #-----------------------------------------------------------------------------
 # Main Script
 #-----------------------------------------------------------------------------
+DESPO_SIMPACE_DIR = '/home/despo/simpace/subject_1_data/'
+
 def main(argv = sys.argv):
+    """
+    argv[1]: the top subject directory 
+
+    """
     sub = argv[1]
     numvols = 4 #number of initial volumes to discard
 
     #get list of dicoms
-    sub_dir = '/home/despo/simpace/subject_%s_data/' %(sub)
+    if len(argv) >= 2:
+        # first argument is the top subject directory
+        sub_dir = argv[1]
+    else:
+        sub_dir = DESPO_SIMPACE_DIR 
+    
+    assert check_dir(sub_dir, ['exists'])
     sess_dirs = glob(pjoin(sub_dir,'ImageData*'))
     sess_dirs = sort_ctime(sess_dirs)
 
@@ -199,7 +240,7 @@ def main(argv = sys.argv):
         out_dir = pjoin(sub_dir,'rename_files','sess%02d' %(sessidx+1))
         
         #rm the directory and contents if it already exists
-        if os.path.exists(out_dir):
+        if check_dir(out_dir, ['exists']):
             try:
                 shutil.rmtree(out_dir)
             except:
