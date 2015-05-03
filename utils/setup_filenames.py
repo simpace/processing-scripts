@@ -281,18 +281,23 @@ def main(argv = sys.argv):
             new_fname = 'sub%02d_sess%02d_run%02d' %(int(sub),sessidx+1,runidx+1)
             new_runname = pjoin(out_dir,new_fname)
             new_dcmdir = pjoin(new_runname,'dicoms')
+            print new_dcmdir # debug
+            print new_runname # debug
 
-            #check that I can write in these directory
-            if not (isuser_writeable(new_runname) and isuser_executeable(new_runname)):
-                # attempt to change permissions
-                os.chmod(new_runname, 0o770)
-            #check that I can write in these directory
-            if not (isuser_writeable(new_dcmdir) and isuser_executeable(new_dcmdir)):
-                # attempt to change permissions
-                os.chmod(new_dcmdir, 0o770)
+            #-------- Directory not created yet - cannot check 
+            #- if not (isuser_writeable(new_runname) and isuser_executeable(new_runname)):
+            #-     # attempt to change permissions
+            #-     os.chmod(new_runname, 0o770)
+            #- if not (isuser_writeable(new_dcmdir) and isuser_executeable(new_dcmdir)):
+            #-     # attempt to change permissions
+            #-     os.chmod(new_dcmdir, 0o770)
 
             #copy dir with the new name
-            shutil.copytree(runname,new_dcmdir)
+            try:
+                # which permissions are given in the copy ?
+                shutil.copytree(runname,new_dcmdir)
+            except:
+                print "cannot copytree " + runname + " in " + new_dcmdir
 
             init_dcmdir = pjoin(new_dcmdir,'first_vols')
             if not os.path.exists(init_dcmdir):
