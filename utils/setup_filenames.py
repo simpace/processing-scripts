@@ -44,6 +44,8 @@ def isuser_executeable(filepath):
 def check_dir(filepath, checklist=['exists']):
     """
     check that directory has the attribute in checklist
+    With no argument, check_dir verifies existence and
+    is equivalent to os.path.isdir(filepath)
     parameters:
     -----------
     filename: string
@@ -210,23 +212,25 @@ def move_first_vols(new_dcmdir,init_dcmdir,numvols=4):
 # Main Script
 #-----------------------------------------------------------------------------
 DESPO_SIMPACE_DIR = '/home/despo/simpace/subject_1_data/'
+SUB_NUM = 1
+NB_DISCARD_VOL = 4 #number of initial volumes to discard
 
 def main(argv = sys.argv):
     """
-    argv[1]: the top subject directory 
-
+    argv[1]: the top subject directory. 
+             optional, if not given defaults to DESPO_SIMPACE_DIR
     """
-    sub = argv[1]
-    numvols = 4 #number of initial volumes to discard
-
     #get list of dicoms
     if len(argv) >= 2:
         # first argument is the top subject directory
         sub_dir = argv[1]
     else:
         sub_dir = DESPO_SIMPACE_DIR 
-    
     assert check_dir(sub_dir, ['exists'])
+
+    numvols = NB_DISCARD_VOL 
+    sub = SUB_NUM
+    
     sess_dirs = glob(pjoin(sub_dir,'ImageData*'))
     sess_dirs = sort_ctime(sess_dirs)
 
@@ -240,14 +244,15 @@ def main(argv = sys.argv):
         out_dir = pjoin(sub_dir,'rename_files','sess%02d' %(sessidx+1))
         
         #rm the directory and contents if it already exists
-        if check_dir(out_dir, ['exists']):
+        # !!!!!!! DEBUG MODE : remove dir if exists 
+        if check_dir(out_dir, ['exists']): # equivalent to osp.isdir(out_dir)
             try:
                 shutil.rmtree(out_dir)
             except:
                 print "cannot remove " + out_dir
 
         #only run if this directory does not exist yet
-        if not os.path.exists(out_dir):
+        if not check_dir(out_dir, ['exists']):
             try:
                 os.makedirs(out_dir, 0o770) 
             except:
@@ -294,7 +299,8 @@ def main(argv = sys.argv):
                 try:
                     os.makedirs(init_dcmdir, 0o770)
                 except:
-                    print "cannot create 'first_vols' in " + new_dcmdir
+                    st = os.stat(init_dcmdir)
+                    print "cannot create 'first_vols' in " + new_dcmdir + str(st.st_mode)
                     raise
 
             #move the first four dcms to a new dir
@@ -303,8 +309,12 @@ def main(argv = sys.argv):
             #do dicom conversion
             #first create a nifti directory
             nii_dir = pjoin(new_runname,'data')
-            if not os.path.exists(nii_dir):
+            if not check_dir(nii_dir):
                 os.makedirs(nii_dir, 0o770)
+            else:
+                print "nifti directory " + nii_dir + " already exists"
+                raise
+
             dcm_files = sorted(glob(pjoin(new_dcmdir,'*.dcm')))
             dicom_convert.inputs.in_files = dcm_files
             dicom_convert.inputs.output_dir = nii_dir
