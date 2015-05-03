@@ -189,7 +189,7 @@ def rename_niftis(prefix,nii_dir,numvols):
     for fidx, fname in enumerate(niftis):
         
         new_fname = """%s-%04d.nii""" %(prefix,vols[fidx])
-        print new_fname
+        # print new_fname
         
         #change the filenames
         shutil.move(fname,pjoin(nii_dir,new_fname))
@@ -240,6 +240,7 @@ def main(argv = sys.argv):
 
     for sessidx, sess in enumerate(sess_dirs):
 
+        print "working on session " + sess
         #setup the output directory for the new file names,
         out_dir = pjoin(sub_dir,'rename_files','sess%02d' %(sessidx+1))
         
@@ -281,8 +282,9 @@ def main(argv = sys.argv):
             new_fname = 'sub%02d_sess%02d_run%02d' %(int(sub),sessidx+1,runidx+1)
             new_runname = pjoin(out_dir,new_fname)
             new_dcmdir = pjoin(new_runname,'dicoms')
-            print new_dcmdir # debug
-            print new_runname # debug
+            print " \t working on run : " + runname # debug
+            print " \t run name : " + new_runname # debug
+            print " \t new_dcmdir : " + new_dcmdir
 
             #-------- Directory not created yet - cannot check 
             #- if not (isuser_writeable(new_runname) and isuser_executeable(new_runname)):
