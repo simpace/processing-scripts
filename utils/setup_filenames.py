@@ -301,8 +301,8 @@ def main(argv = sys.argv):
             new_runname = pjoin(out_dir,new_fname)
             new_dcmdir = pjoin(new_runname,'dicoms')
             print " \t working on run : " + runname # debug
-            print " \t run name : " + new_runname # debug
-            print " \t new_dcmdir : " + new_dcmdir
+            print " \t run name : " + new_runname   # debug
+            print " \t new_dcmdir : " + new_dcmdir  # debug
 
             #-------- Directory not created yet - cannot check 
             #- if not (isuser_writeable(new_runname) and isuser_executeable(new_runname)):
@@ -313,13 +313,24 @@ def main(argv = sys.argv):
             #-     os.chmod(new_dcmdir, 0o770)
 
             #copy dir with the new name
-            assert check_dir(new_dcmdir)
-            assert check_dir(new_dcmdir, 'iswriteable')
             try:
                 # which permissions are given in the copy ?
                 shutil.copytree(runname, new_dcmdir)
             except:
                 print "cannot copytree " + runname + " in " + new_dcmdir
+                raise
+
+            # The copy may have worked, but wrong permission passed. 
+            # Try to 770 these.
+            try:
+                # walk from one level up the new_dcmdir
+                for root, dirs, files in os.walk(new_runname):
+                    for d in dirs:
+                        os.chmod(pjoin(root,d),  0o770)
+                    for f in files:
+                        os.chmod(pjoin(root,f),  0o770)
+            except:
+                print "could not change permissions of " + new_dcmdir
                 raise
 
             init_dcmdir = pjoin(new_dcmdir,'first_vols')
@@ -333,7 +344,7 @@ def main(argv = sys.argv):
                     raise
 
             #move the first four dcms to a new dir
-            move_first_vols(new_dcmdir,init_dcmdir,numvols=numvols)
+            move_first_vols(new_dcmdir, init_dcmdir, numvols=numvols)
             
             #do dicom conversion
             #first create a nifti directory
