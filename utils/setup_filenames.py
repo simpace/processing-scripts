@@ -225,25 +225,29 @@ def main(argv = sys.argv):
     """
     argv[1]: the top subject directory. 
              optional, if not given defaults to DESPO_SIMPACE_DIR
+    argv[2]: a string to specify a session, eg: sept_17, or *
     """
-    #get list of dicoms
+
     if len(argv) >= 2:
+        sess_specified = argv[1]
+    else:
+        sess_specified = ''
+    if sess_specified == '*':
+        sess_specified = ''
+
+    if len(argv) >= 3:
         # first argument is the top subject directory
-        sub_dir = argv[1]
+        sub_dir = argv[2]
     else:
         sub_dir = DESPO_SIMPACE_DIR 
     assert check_dir(sub_dir, ['exists'])
-
-    if len(argv) >= 3:
-        sub_dir_specified = argv[2]
-    else:
-        sub_dir_specified = ''
 
 
     numvols = NB_DISCARD_VOL 
     sub = SUB_NUM
     
-    sess_dirs = glob(pjoin(sub_dir,'ImageData*'+sub_dir_specified+'*'))
+    #get list of dicoms
+    sess_dirs = glob(pjoin(sub_dir,'ImageData*'+sess_specified+'*'))
     sess_dirs = sort_ctime(sess_dirs)
 
     #set up dicom conversion for later
@@ -377,8 +381,12 @@ def main(argv = sys.argv):
                       motion = mot_order)
         with open(json_fname, 'w') as outfile:
             json.dump(params, outfile)
-        #1/0
 
+        try:
+            os.chmod(outfile,  0o770)
+        except:
+            print "Could not chmod " + outfile + " to 0o770 "
+            raise
 
 if __name__ == '__main__':
     main()
