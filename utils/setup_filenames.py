@@ -12,6 +12,9 @@ import shutil
 import tempfile
 import nipype.interfaces.spm.utils as spmu
 import nipype.interfaces.matlab as matlab
+#
+import six
+
 
 #-----------------------------------------------------------------------------
 # Functions
@@ -50,7 +53,7 @@ def check_dir(filepath, checklist=['exists']):
     -----------
     filename: string
         the filepath
-    checklist: list of string
+    checklist: string or list of string
         with all the check to be performed
         ['exists', 'iswritable']
     returns:
@@ -58,6 +61,9 @@ def check_dir(filepath, checklist=['exists']):
     bool 
         a boolean if all checklist conditions are true
     """
+    if isinstance(checklist, six.string_types):
+        checklist = [checklist]
+
     checkbool = True
     for chck in checklist:
         if chck == 'exists':
@@ -228,10 +234,16 @@ def main(argv = sys.argv):
         sub_dir = DESPO_SIMPACE_DIR 
     assert check_dir(sub_dir, ['exists'])
 
+    if len(argv) >= 3:
+        sub_dir_specified = argv[2]
+    else:
+        sub_dir_specified = ''
+
+
     numvols = NB_DISCARD_VOL 
     sub = SUB_NUM
     
-    sess_dirs = glob(pjoin(sub_dir,'ImageData*'))
+    sess_dirs = glob(pjoin(sub_dir,'ImageData*'+sub_dir_specified+'*'))
     sess_dirs = sort_ctime(sess_dirs)
 
     #set up dicom conversion for later
@@ -250,7 +262,10 @@ def main(argv = sys.argv):
             try:
                 shutil.rmtree(out_dir)
             except:
-                print "cannot remove " + out_dir
+                # attempt to change permissions ?
+                # os.chmod(out_dir, 0o770)
+                print "cannot remove : " + out_dir
+                print "please run 'chmod -R 770 on : " + out_dir
 
         #only run if this directory does not exist yet
         if not check_dir(out_dir, ['exists']):
@@ -258,6 +273,9 @@ def main(argv = sys.argv):
                 os.makedirs(out_dir, 0o770) 
             except:
                 print "cannot make " + out_dir
+                raise
+        else:
+            print " directory : " + out_dir + " already exists"
 
         #get the two files for each motion type
         none_dirs = glob(pjoin(sess,'*/Danzone_Testing*/ep2d_simpace_NONE*'))
@@ -295,19 +313,23 @@ def main(argv = sys.argv):
             #-     os.chmod(new_dcmdir, 0o770)
 
             #copy dir with the new name
+            assert check_dir(new_dcmdir)
+            assert check_dir(new_dcmdir, 'iswriteable')
             try:
                 # which permissions are given in the copy ?
-                shutil.copytree(runname,new_dcmdir)
+                shutil.copytree(runname, new_dcmdir)
             except:
                 print "cannot copytree " + runname + " in " + new_dcmdir
+                raise
 
             init_dcmdir = pjoin(new_dcmdir,'first_vols')
             if not os.path.exists(init_dcmdir):
                 try:
                     os.makedirs(init_dcmdir, 0o770)
                 except:
-                    st = os.stat(init_dcmdir)
-                    print "cannot create 'first_vols' in " + new_dcmdir + str(st.st_mode)
+                    st = os.stat(new_dcmdir)
+                    print "cannot create 'first_vols' in " + new_dcmdir + \
+                                                ' mode is :', str(st.st_mode)
                     raise
 
             #move the first four dcms to a new dir
