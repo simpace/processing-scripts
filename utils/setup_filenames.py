@@ -270,11 +270,12 @@ NB_DISCARD_VOL = 4 #number of initial volumes to discard
 
 def main(argv = sys.argv):
     """
-    argv[1]: the top subject directory. 
+    argv[1]: a string to specify a session, eg: sept_17, or *
+    argv[2]: the top subject directory. 
              optional, if not given defaults to DESPO_SIMPACE_DIR
-    argv[2]: a string to specify a session, eg: sept_17, or *
     """
 
+    # first argument is the top subject directory
     if len(argv) >= 2:
         sess_specified = argv[1]
     else:
@@ -283,7 +284,7 @@ def main(argv = sys.argv):
         sess_specified = ''
 
     if len(argv) >= 3:
-        # first argument is the top subject directory
+        # second argument is the top subject directory
         sub_dir = argv[2]
     else:
         sub_dir = DESPO_SIMPACE_DIR 
