@@ -429,7 +429,7 @@ def main(argv = sys.argv):
             json.dump(params, outfile)
 
         try:
-            os.chmod(outfile,  0o770)
+            os.chmod(json_fname,  0o770)
         except:
             print "Could not chmod " + json_fname + " to 0o770 "
             raise
