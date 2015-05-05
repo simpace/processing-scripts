@@ -108,10 +108,33 @@ def get_nonorm(dcm_dirs):
             no_psnorm.append(dcm)
 
     #TEST that there is only one file being returned
+    #if more than one match, find the one with the full number of volumes
     if not len(no_psnorm) == 1:
-        raise ValueError("more than one file matches the norm condition!")
+        no_psnorm = test_nvols(no_psnorm)
 
     return no_psnorm
+
+
+def test_nvols(dcm_dirs, nvols_full=200):
+    """This function reads in a list of directories and returns the one with a full
+    run of data (i.e., the full number of volumes expected)"""
+
+    #initialize a list for directories with full data
+    full_data = []
+
+    #loop through the dicom directories
+    for dcmidx, dcm in enumerate (dcm_dirs):
+
+        nvols = len(glob(pjoin(dcm,'IM-*.dcm')))
+        print dcm, nvols
+        if nvols == nvols_full:
+            full_data.append(dcm)
+
+    #TEST that there is only one dir being returned
+    if not len(full_data) == 1:
+        raise ValueError("more than one run with full data for a condition!")
+
+    return full_data
 
 
 def sort_acqtime(dcm_dirs):
@@ -367,7 +390,6 @@ def main(argv = sys.argv):
             #rename the niftis in this directory 
             rename_niftis(new_fname,nii_dir,numvols)
             
-
         #get info for the params file
         #date of data collection (nb: this assumes all runs were collected in the same day)
         scan_date = get_date(runs_sort)
