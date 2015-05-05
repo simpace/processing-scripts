@@ -431,7 +431,7 @@ def main(argv = sys.argv):
         try:
             os.chmod(outfile,  0o770)
         except:
-            print "Could not chmod " + outfile + " to 0o770 "
+            print "Could not chmod " + json_fname + " to 0o770 "
             raise
 
 if __name__ == '__main__':
