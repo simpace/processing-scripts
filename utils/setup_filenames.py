@@ -87,6 +87,30 @@ def sort_ctime(file_list):
     return files_sorted
 
 
+def sort_acqdate(file_list):
+    """This function takes in a list of files and returns a sorted list of them 
+    by the aquisition time in the dicom header from the localizer"""
+
+    #initialize a list for the dates files
+    dates = []
+    
+    #loop through the directories
+    for fileidx, fname in enumerate (file_list):
+
+        #load the first dicom 
+        test_dcm = sorted(glob(pjoin(fname,'*','Danzone_Testing*','localizer*','IM-*.dcm')))[0]
+        hdr = dicom.read_file(test_dcm)
+        date = hdr.AcquisitionDate
+        
+        dates.append(date)
+
+    #sort the dates and apply this to the directories
+    sort = np.array(dates).argsort()
+    files_sorted = np.array(file_list)[sort]
+
+    return files_sorted.tolist()
+
+
 def get_nonorm(dcm_dirs):
     """This function reads in a list of directories with dicom files,
     loads a test dicom file from each and returns which is NOT prescan normalized
@@ -271,8 +295,8 @@ def main(argv = sys.argv):
     
     #get list of dicoms
     sess_dirs = glob(pjoin(sub_dir,'ImageData*'+sess_specified+'*'))
-    sess_dirs = sort_ctime(sess_dirs)
-
+    sess_dirs = sort_acqdate(sess_dirs)
+    
     #set up dicom conversion for later
     matlab.MatlabCommand.set_default_paths('/usr/local/matlab-tools/spm/spm8')
     dicom_convert = spmu.DicomImport()
