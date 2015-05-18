@@ -97,8 +97,6 @@ def _create_bandpass_bf(npoint, dt, bandf, exclude=False):
 
 
 
-
-
 #- in the future : replace this by import the right version of nipy -#
 def _cosine_drift(period_cut, frametimes):
     """Create a cosine drift matrix with periods greater or equals to period_cut
@@ -142,32 +140,58 @@ def _cosine_drift(period_cut, frametimes):
 #-----------------------------------------------------------------------------#
 def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None, minvox=1):
     """
-    Extract signals from list of 4d nifti
+    Extract signals from list of 4d nifti 
     
-    inputs
-    ------
+    Parameters
+    -----------
     rois_dir: str
     roi_prefix: str
     fn_img4d: str
     mask: str or nibabel image
     minvox: minimum number of voxel in sampled region
+
+    returns:
+    --------
+    signals: dict
+        keys are the names of the regions (from filenames)
+        values: None, or the signal in the region
+    issues: dict
+        keys are the names of the regions (from filenames)
+        values: None if there is no issue, a tuple otherwise
     """
     
     IMGDIM = 3
-    img4d = nib.load(fn_img4d)
+    
+    if isinstance(fn_img4d, string_types):
+        img4d = nib.load(fn_img4d)
+    elif hasattr(fn_img4d, 'get_affine') and hasattr(fn_img4d, 'get_data'):
+        img4d = fn_img4d 
+    else:
+        raise ValueError('I dont think {} can be thought as a 4d image',fn_img4d)
+
     aff_img = xyz_affine(img4d.get_affine(), xyz=[0,1,2])
     
     # 1- Check roi affine are all the same
     roi_files = gb.glob(osp.join(rois_dir, roi_prefix))
+    nb_rois = len(roi_files)
+
+    # make sure list is not empty
+    assert roi_files
+
     roi_imgs = {}
     for fn in roi_files:
         roi_imgs[fn] = nib.load(fn)
-    roi_affs = np.asarray([img.get_affine()[:IMGDIM,:IMGDIM] for img in roi_imgs.values()])
+
+    roi_affs = np.asarray([img.get_affine()[:IMGDIM,:IMGDIM] 
+            for img in roi_imgs.values()])
+    assert roi_affs.shape == (nb_rois, IMGDIM, IMGDIM), \
+            "roi_affs.shape unexpected: {}".format(roi_affs.shape)
+    
     aff_roi = roi_affs[0].copy()
     roi_affs -= aff_roi
     norms_affs = [lin.norm(roi_affs[i], 'fro') for i in range(len(roi_affs))]
-    assert lin.norm(np.asarray(norms_affs))  < TINY 
-        
+    assert lin.norm(np.asarray(norms_affs))  < TINY, "roi affines not all the sames"
+
     # 2- check that rois in roi_dir are compatible with img4d
     # print(aff_roi[:IMGDIM,:IMGDIM], aff_img[:IMGDIM,:IMGDIM])
     assert lin.norm(aff_roi[:IMGDIM,:IMGDIM] - aff_img[:IMGDIM,:IMGDIM], 'fro')  < TINY
@@ -386,7 +410,6 @@ def make_design_mtx(spm_mvt_file, hfcut=128, skip_TR=SKIPTR, normalize=True, to_
               drift_model='cosine', hfcut=hfcut, 
               drift_order=1,
               fir_delays=[0], add_regs=mvt_arr, add_reg_names=mvt_lab)
-
 
     if normalize:
     	X -= X.mean(axis=0)
