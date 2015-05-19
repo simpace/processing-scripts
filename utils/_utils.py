@@ -138,7 +138,142 @@ def _cosine_drift(period_cut, frametimes):
 #-----------------------------------------------------------------------------#
 #-  This function should be a wrapper over nilearn stuff -#
 #-----------------------------------------------------------------------------#
+
+
+def _check_images_compatible(roi_files, nifti_image, imgdim=3):
+
+    if isinstance(roi_files, string_types):
+        roi_files = [roi_files]
+
+    nb_rois = len(roi_files)
+
+    # construct a list of affine, check the dimension of the list 
+    roi_affs =  np.asarray([img.get_affine() for img in 
+                                        [nib.load(fn) for fn in roi_files] ])
+
+    assert roi_affs.shape == (nb_rois, imgdim+1, imgdim+1), \
+            "roi_affs.shape unexpected: {}".format(roi_affs.shape)
+
+    # check all the same affine as the first one
+    aff_roi = roi_affs[0].copy()
+    roi_affs -= aff_roi
+    norms_affs = [lin.norm(roi_affs[i], 'fro') for i in range(len(roi_affs))]
+    assert lin.norm(np.asarray(norms_affs))  < TINY, "roi affines not all the sames"
+
+    # now check that the image has the same affine
+    # check we can get img affine - THIS ASSUMES A 3D AFFINE - check to be done
+
+
+    if isinstance(nifti_image, string_types):
+        try: 
+            nifti_image = nib.load(nifti_image)
+        except:
+            raise ValueError, "niti image, are you sure ? {}".format(nifti_image)
+
+    try:
+        img_aff = nifti_image.get_affine()
+    except:
+        raise ValueError, "check nifti_image is an nifti image"
+
+    assert np.allclose(aff_roi, img_aff), \
+           "aff_roi : {} and img_aff: {} not close enough".format(aff_roi, img_aff)
+
+    return True
+
+
+def _get_and_sort_roi_files(rois_dir, roi_prefix):
+
+    roi_files = gb.glob(osp.join(rois_dir, roi_prefix))
+    #print(roi_files)
+
+    # fails if roi_files == []
+    assert roi_files, " roi_files empty {}".format(roi_files)
+    # sort the files to have some consistency in the behaviour
+    roi_files.sort()
+
+    return roi_files
+
+
+def _yield_roi_mask(roi_files, imgdim=3, roi_threshold=0.5):
+    """
+    """
+
+    for fn_roi in roi_files:
+        label = osp.splitext(osp.basename(fn_roi))[0]
+        img = nib.load(fn_roi)
+        roi_mask = img.get_data().astype(float) > roi_threshold
+
+        yield label, roi_mask
+
+
 def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None, minvox=1):
+    """
+    Extract signals from list of 4d nifti 
+    
+    Parameters
+    -----------
+    rois_dir: str
+    roi_prefix: str
+    fn_img4d: str or img
+    mask: str or nibabel image
+    minvox: minimum number of voxel in sampled region
+
+    returns:
+    --------
+    signals: dict
+        keys are the names of the regions (from filenames)
+        values: None, or the signal in the region
+    issues: dict
+        keys are the names of the regions (from filenames)
+        values: None if there is no issue, a tuple otherwise
+    """
+
+    IMGDIM = 3
+    roi_files = _get_and_sort_roi_files(rois_dir, roi_prefix)
+    
+    print(roi_files[:4])
+
+
+    if isinstance(mask, string_types):
+        mask = nib.load(mask)
+    if isinstance(fn_img4d, string_types):
+        img4d = nib.load(fn_img4d)
+    else:
+        img4d = fn_img4d
+
+    assert  _check_images_compatible(roi_files, img4d, imgdim=IMGDIM)
+
+    assert np.allclose(mask.get_affine(), img4d.get_affine()), \
+            "mask {} and img4d {} affine not close ".format(
+                  mask.get_affine(), img4d.get_affine())
+    
+    mask_arr = np.asarray(mask.get_data()).astype(bool)
+    # some checks on mask ?
+    nb_vox_mask = mask_arr.sum()
+    nb_vox_img  = np.asarray(mask_arr.shape).prod()
+    print(" in mask : {}, out of {} voxels".format( nb_vox_mask, nb_vox_img))
+    assert nb_vox_mask > .20*nb_vox_img
+
+    img_arr = np.asarray(img4d.get_data())
+    
+    # initialize dicts 
+    signals = {}
+    issues = {}
+    for label, roi_msk in _yield_roi_mask(roi_files):
+        print("nb voxels in mask of {} is {} \n".format(label, roi_msk.sum()))
+        this_msk = np.logical_and(roi_msk, mask_arr)
+        
+        if this_msk.sum() < minvox:
+            issues[label] = "this_msk.sum() < minvox: {} < {}".format(
+                                    this_msk.sum(), minvox)
+        else:
+            # dimension should be (# of voxels in ROI and mask, time)
+            signals[label] = img_arr[this_msk].sum(axis=0)
+
+    return signals, issues
+
+
+def _extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None, minvox=1):
     """
     Extract signals from list of 4d nifti 
     
@@ -225,6 +360,8 @@ def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None, minvox=1):
     for roi_name, roi in roi_imgs.iteritems():
         issues[roi_name] = False
         ijk_roi = np.asarray(np.where(roi.get_data().astype('bool')))
+        print(roi_name)
+        print(ijk_roi.shape)
     
         if translate:
             ijk_roi += translation
@@ -244,6 +381,7 @@ def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None, minvox=1):
         if mask != None:
             # not all voxels in the mask ? 
             vox_in_mask = np.all(data_mask[ijk_roi], axis=0)
+            print('vox_in_mask dim {}'.format(vox_in_mask.shape))
             if not np.all(data_mask[ijk_roi]):
                 issues[roi_name] = ('not all voxels in mask', vox_in_mask.sum())
                 print("some voxels not in mask")
