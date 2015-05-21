@@ -7,13 +7,14 @@ import re
 import json
 from glob import glob
 from os.path import join as pjoin
+import os.path as osp
 import dicom
 import shutil
 import tempfile
 import nipype.interfaces.spm.utils as spmu
 import nipype.interfaces.matlab as matlab
 #
-import six
+from six import string_types
 
 
 #-----------------------------------------------------------------------------
@@ -75,6 +76,8 @@ def check_dir(filepath, checklist=['exists']):
                 temp.close()
             except:
                 checkbool = False
+        else:
+            raise ValueError, ' {} not implemented '.format(chck)
 
     return checkbool
 
@@ -260,6 +263,51 @@ def move_first_vols(new_dcmdir,init_dcmdir,numvols=4):
 
         mv_command = """mv %s %s""" %(dcm,init_dcmdir)
         os.system(mv_command)
+
+
+def rm_and_create(rm_dir, perm=0o770):
+
+    # 0o770 : rwxrws___  
+    def remove_readonly(func, path, excinfo):
+        os.chmod(path, stat.S_IWUSR)
+        func(path)
+
+    if os.path.isdir(rm_dir):
+        try:
+            # if fails, onerror tries to change permissions
+            shutil.rmtree(rm_dir, onerror=remove_readonly)
+        except:
+            raise ValueError, 'cannot rm {}, check perm.'.format(rm_dir)
+    else:
+        try:
+            os.makedirs(rm_dir, perm)
+        except:
+            raise ValueError, 'cannot create {}, check perm.'.format(rm_dir)
+
+
+def _check_glob_res(res, ensure=None, files_only=True):
+    """
+    Will check the result of a glob: files must exist
+    ensure == 1: will check there is only one file and return a string
+    """
+
+    if isinstance(res, string_types):
+        res = [res]
+
+    if isinstance(res, list):
+        if ensure is not None:
+            assert len(res) == ensure, " len(res) {} != ensure {}".format(
+                                         len(re), ensure)
+        if files_only:
+            for f in res:
+                assert osp.isfile(f), " {} is not a file".format(f)
+    
+    if ensure == 1:
+        res = res[0]
+
+    return res
+
+        
 
 #-----------------------------------------------------------------------------
 # Main Script
