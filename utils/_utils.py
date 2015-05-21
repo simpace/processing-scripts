@@ -5,6 +5,7 @@ import os.path as osp
 import glob as gb
 import scipy.linalg as lin
 from six import string_types
+import warnings
 from collections import OrderedDict
 
 # import matplotlib.pyplot as plt
@@ -33,9 +34,9 @@ def project_filter(data, bandf, dt):
     lowf = bandf[0]
     higf = bandf[1]
     tim = np.linspace(0, (nt-1)*dt, nt)
-    #cosBF = dm._cosine_drift(1./lowf, frametimes)
+    #cosBF = dm._cosine_low_freq(1./lowf, frametimes)
     #cosBF = np.loadtxt('./dctmtx_114_114.txt')
-    cosBF = _cosine_drift((2*dt), tim)
+    cosBF = _cosine_low_freq((2*dt), tim)
     #print(cosBF.shape)
     
     #order_h = int(np.floor(2*T) * higf)
@@ -78,7 +79,7 @@ def _create_bandpass_bf(npoint, dt, bandf, exclude=False):
     lowf = bandf[0]
     higf = bandf[1]
     tim = np.linspace(0, (nt-1)*dt, nt)
-    cosBF = _cosine_drift((2*dt), tim)
+    cosBF = _cosine_low_freq((2*dt), tim)
     
     order_h = int(np.floor(2*nt*higf*dt))
     order_l = int(np.floor(2*nt*lowf*dt))
@@ -105,7 +106,7 @@ def _create_bandpass_bf(npoint, dt, bandf, exclude=False):
 
 
 #- in the future : replace this by import the right version of nipy -#
-def _cosine_drift(period_cut, frametimes):
+def _cosine_low_freq(period_cut, frametimes):
     """Create a cosine drift matrix with periods greater or equals to period_cut
 
     Parameters
@@ -137,15 +138,50 @@ def _cosine_drift(period_cut, frametimes):
     cdrift[:,order-1] = 1. # or 1./sqrt(len_tim) to normalize
     return cdrift
 
+def _cosine_high_freq(period_cut, frametimes):
+    """ Create a cosine drift matrix with periods  
+        **smaller** or equals to period_cut
 
-#- use nilearn to get to get the rois and check all affines are the same
+    Parameters
+    ----------
+    period_cut: float 
+         Cut period of the low-pass filter (in sec)
+    frametimes: array of shape(nscans)
+         The sampling times (in sec)
 
-#- get  4d image - return array? iterator over nibabel images? 
+    Returns
+    -------
+    cdrift:  array of shape(n_scans, n_drifts)
+             cosin drifts plus a constant regressor at cdrift[:,0]
+
+    Ref: http://en.wikipedia.org/wiki/Discrete_cosine_transform DCT-II
+    """
+    len_tim = len(frametimes)
+    n_times = np.arange(len_tim)
+    hfcut = 1./ period_cut # input parameter is the period  
+
+    
+    dt = frametimes[1] - frametimes[0] # frametimes.max() should be (len_tim-1)*dt    
+
+    order_lf = int(np.floor(2*len_tim*hfcut*dt)) # s.t. hfcut = 1/(2*dt) yields len_tim
+    order_hf = len_tim - order_lf
+    print("lf ", order_lf, "hf", order_hf, "len_tim", len_tim)
+
+    cdrift = np.zeros((len_tim, order_hf))
+    print(cdrift.shape)
+    nfct = np.sqrt(2.0/len_tim)
+    
+    for k in range(order_lf, len_tim):
+        cdrift[:,k-order_lf] = nfct * np.cos((np.pi/len_tim)*(n_times + .5)*k)
+    
+    # cdrift[:,order-1] = 1. # or 1./sqrt(len_tim) to normalize
+    return cdrift
+
+
 
 #-----------------------------------------------------------------------------#
 #-  This function should be a wrapper over nilearn stuff -#
 #-----------------------------------------------------------------------------#
-
 
 def _check_images_compatible(roi_files, nifti_image, imgdim=3):
 
@@ -308,7 +344,58 @@ def _dict_signals_to_arr(dsig):
     return (arr, _keys)
 
 
-def extract_mvt_run(mvtfile, run_idx, run_len):
+
+#- modified from nilearn
+def _standardize(signals, demean=True, normalize=True, inplace=True):
+    """ Center and norm a given signal (time is along first axis)
+    Attention: this will not center constant signals
+    but will replace these with colums of ones
+
+    Parameters
+    ==========
+    signals: numpy.ndarray
+        Timeseries to standardize
+    demean: bool
+        if demeaning is required
+    normalize: bool
+        if True, shift timeseries to zero mean value and scale
+        to unit energy (sum of squares).
+
+    Returns
+    =======
+    std_signals: numpy.ndarray
+        copy of signals, normalized.
+    """
+    
+    if not inplace:
+        signals = signals.copy()
+
+    std = signals.std(axis=0)
+    
+    if demean:
+        not_to_demean = std < TINY
+        signals -= signals.mean(axis=0)
+        shape_constant_signals = (signals.shape[0], not_to_demean.sum())
+        signals[:, not_to_demean] = np.ones(shape_constant_signals)
+    
+    if signals.shape[0] == 1:
+        warnings.warn('Standardization of 3D signal has been requested but '
+            'would lead to zero values. Skipping.')
+        return signals
+
+    if normalize:
+        if not demean:
+            # remove mean if not already detrended
+            signals = signals - signals.mean(axis=0)
+
+        #std = np.sqrt((signals ** 2).sum(axis=0))
+        std[std < TINY] = 1.  # np.finfo(np.float).eps or TINY? avoid numerical problems
+        signals /= std
+
+    return signals
+
+
+def extract_mvt(mvtfile, run_idx, run_len):
     """
     """
     mvt = np.loadtxt(mvtfile)
@@ -318,11 +405,47 @@ def extract_mvt_run(mvtfile, run_idx, run_len):
     assert mvt.shape[0] >= (run_idx+1)*run_len, \
           "mvt.shape[0] < (run_idx+1)*run_len {} {}".format(run_idx, run_len)
     
-    return mvt[run_idx*run_len:(run_idx+1)*run_len,:]
+    mvt_labs = ['tx', 'ty', 'tz', 'rx', 'ry', 'rz']
+    mvt_arr  = _standardize(mvt[run_idx*run_len:(run_idx+1)*run_len,:])
 
+    return mvt_arr, mvt_labs
 
+def extract_roi_run(dcsf, csf_filename, run_4d, check_lengh=None):
+    #--- get CSF----------#
 
+    csf_signals, csf_issues, csf_info = \
+                    ucr.extract_signals(dcsf, csf_filename, run_4d)
 
+    #- check csf_signals ok ?
+    assert len(csf_signals) == 1 # only one signal in dict
+    csf_arr = csf_signals[csf_signals.keys()[0]]
+    if check_lengh is not None:
+        assert csf_arr.shape == (check_lengh,)
+
+    # standardized csf_arr
+    csf_arr = _standardize(csf_arr.reshape(csf_arr.shape[0], 1))
+    csf_labs = ['csf']
+    
+    return csf_arr, csf_labs
+
+def extract_bf(low_freq, high_freq, volnb, dt, verbose=False):
+    #--- get cosine functions; ----------#
+
+    frametimes = np.linspace(0, (volnb-1)*dt, volnb)    
+    lf_arr = _standardize(_cosine_low_freq(1./low_freq, frametimes))
+    hf_arr = _standardize(_cosine_high_freq(1./high_freq, frametimes))
+    order_lf = lf_arr.shape[1]
+    order_hf = hf_arr.shape[1]
+
+    assert order_lf > 0 and order_hf > 0, "orders off {}, {}".format(
+                                                        order_lf, order_hf)
+    lf_labs = ["lf{:02d}".format(idx) for idx in range(order_lf)]
+    hf_labs = ["hf{:02d}".format(idx) for idx in range(order_hf)]
+
+    if verbose:
+        print("order lf : {}, order hf : {}".format(order_lf, order_hf))
+
+    return np.hstack((lf_arr, hf_arr)), lf_labs+hf_labs
 
 
 #----------------------------------------------------------------------------#
