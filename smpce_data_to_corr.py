@@ -2,6 +2,7 @@ import shutil
 import os 
 import os.path as osp
 import glob as gb
+import json
 import numpy as np
 from six import string_types
 #
@@ -53,8 +54,16 @@ def do_one_run(file_names, idx_run, mask, verbose=1):
     dsess = osp.dirname(ddir) # session directory is one up
     droi = osp.join(ddir, 'registered_files')
     dsig = osp.join(ddir, 'extracted_signals')
-    fn_sig = osp.join(dsig, 'signal_run_{:02d}'.format(idx_run))
-    fn_fsig = osp.join(dsig, 'flt_signal_run_{:02d}'.format(idx_run))
+
+
+    paramfile = gb.glob(osp.join(dsess,"su*params"))
+    paramfile = suf._check_glob_res(paramfile, ensure=1, files_only=True)
+    with open(paramfile) as fparam:
+         param = json.load(fparam)
+         mvt_cond = str(param['motion'][idx_run])
+
+    fn_sig = osp.join(dsig, 'signal_run_{:02d}'.format(idx_run) + mvt_cond)
+    fn_fsig = osp.join(dsig, 'filtered_signal_run_{:02d}'.format(idx_run) + mvt_cond)
     # - csf file
     dcsf = osp.join(ddir, 'csf_mask')
     csf_filename =  'csf_map_final.nii.gz'
@@ -72,65 +81,40 @@ def do_one_run(file_names, idx_run, mask, verbose=1):
     high_freq = 0.1
     dt = TR 
     
+
     # extract signals and save them in preproc/roi_signals
     #-----------------------------------------------------
     run_4d = concat_niimgs(file_names, ensure_ndim=4)
     signals, _issues, _info = ucr.extract_signals(droi, roi_prefix, run_4d, 
                                                         mask=mask, minvox=1)   
-    arr_sig, labels = ucr._dict_signals_to_arr(signals)
+    arr_sig, labels_sig = ucr._dict_signals_to_arr(signals)
 
     # rm previous directory
     suf.rm_and_create(dsig)
-    np.savez(fn_sig, arr_sig, labels) 
+    np.savez(fn_sig, arr_sig, labels_sig) 
 
     # construct matrix of counfounds
     #-----------------------------------------------------
-
     #--- get CSF
-    csf_signals, csf_issues, csf_info = \
-                    ucr.extract_signals(dcsf, csf_filename, run_4d)
-    #- check csf_signals ok ?
-    assert len(csf_signals) == 1 # only one signal in dict
-    csf_arr = csf_signals[csf_signals.keys()[0]]
-    assert csf_arr.shape == (VOLNB,)
-    csf_arr = csf_arr.reshape(VOLNB, 1)
-    csf_labs = ['csf']
-    # standardized csf_arr
-    
+    csf_arr, csf_labs = ucr.extract_roi_run(dcsf, csf_filename, run_4d, 
+                                                            check_lengh=VOLNB)
     #--- get MVT
-    mvt_arr = ucr.extract_mvt_run(mvtfile, idx_run, VOLNB)
-    mvt_labs = ['tx', 'ty', 'tz', 'rx', 'ry', 'rz']
-    # standardized mvt_arr
-    
+    mvt_arr, mvt_labs = ucr.extract_mvt(mvtfile, idx_run, VOLNB)
     #--- get cosine functions;
-    bf_arr, (order_lf, order_hf) = ucr._create_bandpass_bf(VOLNB, dt, 
-                                                        (low_freq, high_freq))
-    assert order_lf > 0 and order_hf > 0, "orders off {}, {}".format(
-                                                        order_lf, order_hf)
-    lf_labs = ["lf{:02d}".format(idx) for idx in range(order_lf)]
-    hf_labs = ["hf{:02d}".format(idx) for idx in range(order_hf)]
-    if verbose:
-        print("order lf : {}, order hf : {}".format(order_lf, order_hf))
-    
-    
+    bf_arr, bf_labs = ucr.extract_bf(low_freq, high_freq, VOLNB, dt, 
+                                                            verbose=False)
     #--- put it together  
     counfounds = np.hstack((csf_arr, mvt_arr, bf_arr))
-    counfounds_labs = csf_labs + mvt_labs + lf_labs + hf_labs
+    counfounds_labs = csf_labs + mvt_labs + bf_labs
     if verbose:
        print("csf.shape {}, mvt.shape {}, bf.shape {}".format(
-                     csf_arr.shape, mvt_arr.shape, bf_arr.shape)
+                     csf_arr.shape, mvt_arr.shape, bf_arr.shape))
 
     # filter and compute correlation
     #-----------------------------------------------------
+    f_arr_sig = ucr._R_proj(counfounds, arr_sig)
 
-    flt_arr_sig = ucr._R_proj(counfounds, arr_sig)
-
-
-    
-
-
-    # save correlation
-
-
+    # save filtered signals 
+    np.savez(fn_fsig, f_arr_sig, counfounds_labs) 
 
 
