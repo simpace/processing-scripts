@@ -1,6 +1,8 @@
 """Script to setup dicom directories to standard format
 """
 
+MATLAB_INSTALLED = False
+
 import os, sys, stat
 import numpy as np
 import re
@@ -11,10 +13,11 @@ import os.path as osp
 import dicom
 import shutil
 import tempfile
-import nipype.interfaces.spm.utils as spmu
-import nipype.interfaces.matlab as matlab
-#
 from six import string_types
+if MATLAB_INSTALLED:
+    import nipype.interfaces.spm.utils as spmu
+    import nipype.interfaces.matlab as matlab
+#
 
 
 #-----------------------------------------------------------------------------
@@ -278,11 +281,10 @@ def rm_and_create(rm_dir, perm=0o770):
             shutil.rmtree(rm_dir, onerror=remove_readonly)
         except:
             raise ValueError, 'cannot rm {}, check perm.'.format(rm_dir)
-    else:
-        try:
-            os.makedirs(rm_dir, perm)
-        except:
-            raise ValueError, 'cannot create {}, check perm.'.format(rm_dir)
+    try:
+        os.makedirs(rm_dir, perm)
+    except:
+        raise ValueError, 'cannot create {}, check perm.'.format(rm_dir)
 
 
 def _check_glob_res(res, ensure=None, files_only=True):
@@ -297,7 +299,7 @@ def _check_glob_res(res, ensure=None, files_only=True):
     if isinstance(res, list):
         if ensure is not None:
             assert len(res) == ensure, " len(res) {} != ensure {}".format(
-                                         len(re), ensure)
+                                         len(res), ensure)
         if files_only:
             for f in res:
                 assert osp.isfile(f), " {} is not a file".format(f)
@@ -316,13 +318,17 @@ DESPO_SIMPACE_DIR = '/home/despo/simpace/subject_1_data/'
 SUB_NUM = 1
 NB_DISCARD_VOL = 4 #number of initial volumes to discard
 
+
 def main(argv = sys.argv):
     """
     argv[1]: a string to specify a session, eg: sept_17, or *
     argv[2]: the top subject directory. 
              optional, if not given defaults to DESPO_SIMPACE_DIR
     """
-
+    if not MATLAB_INSTALLED:
+        print("MATLAB_INSTALLED is {}:doing nothing".format(MATLAB_INSTALLED))
+        return None
+    
     # first argument is the top subject directory
     if len(argv) >= 2:
         sess_specified = argv[1]
