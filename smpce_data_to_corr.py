@@ -21,6 +21,15 @@ TR = 2.0
 
 # from nilearn.image.image import _compute_mean
 
+
+def file_or_dir(dlo, basedir, action):
+    """
+    dlo: directory layout and patterns, specific 
+    """
+    pass
+
+
+
 def do_one_sess(DDIR, idx_sess):
     """
     take a session directory and extract the roi signals
