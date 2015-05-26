@@ -8,7 +8,8 @@
 		"roi": "registered_files",
 		"signals": "extracted_signals",
 		"realign": "realign",
-		"smooth": "smooth"
+		"smooth": "smooth",
+		"runs_mask": "mask"
 	},
 	"pat": {
 		"sub+": "*sub{:02d}_",
