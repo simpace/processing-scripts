@@ -458,8 +458,8 @@ def extract_bf(low_freq, high_freq, volnb, dt, verbose=False):
     #--- get cosine functions; ----------#
 
     frametimes = np.linspace(0, (volnb-1)*dt, volnb)    
-    lf_arr = _standardize(_cosine_low_freq(1./low_freq, frametimes))
-    hf_arr = _standardize(_cosine_high_freq(1./high_freq, frametimes))
+    lf_arr = _standardize(_cosine_low_freq(1./low_freq, frametimes), verbose=verbose)
+    hf_arr = _standardize(_cosine_high_freq(1./high_freq, frametimes), verbose=verbose)
     order_lf = lf_arr.shape[1]
     order_hf = hf_arr.shape[1]
 
