@@ -34,7 +34,7 @@ def file_or_dir(dlo, basedir, action):
 
 
 
-def process_all(dbase):
+def process_all(dbase, verbose=False):
     """
     parameters:
     -----------
@@ -60,17 +60,20 @@ def process_all(dbase):
     # loop over subjects
     subj_idx = range(1,ddata['nb_sub']+1) # starts at 1, hence + 1
     subj_dirs = [osp.join(dbase, (dlayo['dir']['sub+']).format(idx)) for idx in subj_idx]
+    # check all subj_dirs exists
+    for sub_dir in subj_dirs:
+        assert osp.isdir(sub_dir), "sub_dir"
 
     subjs_info = {}
     sub_curr = {}
     for sub_idx, sub_dir in enumerate(subj_dirs, 1): # start idx at 1
         sub_curr['sub_idx'] = sub_idx
         sub_curr['sub_dir'] = sub_dir
-        subjs_info[sub_dir] =  do_one_subject(sub_curr, params) 
+        subjs_info[sub_dir] =  do_one_subject(sub_curr, params, verbose=verbose) 
 
     return subjs_info
 
-def do_one_subject(sub_curr, params):
+def do_one_subject(sub_curr, params, verbose=False):
     """
     Take the bdirectory at the moment subject
     and launch sessions processing
@@ -94,11 +97,11 @@ def do_one_subject(sub_curr, params):
     for sess_idx, sess_dir in enumerate(sess_dirs, 1): # start idx at 1
         sess_curr['sess_idx'] = sess_idx
         sess_curr['sess_dir'] = sess_dir
-        sesss_info[sess_dir] = do_one_sess(sess_curr, sub_curr, params) 
+        sesss_info[sess_dir] = do_one_sess(sess_curr, sub_curr, params, verbose=verbose) 
 
     return sesss_info
     
-def do_one_sess(sess_curr, sub_curr, params):
+def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     """
     """
 
@@ -133,9 +136,9 @@ def do_one_sess(sess_curr, sub_curr, params):
 
     #- Get runs' filenames
     #------------------------
-    pat_imgs_files = dlayo['pat']['sub+sess+run+'] 
+    pat_imgs_files = dlayo['pat']['sub+sess+run+']+"*.nii*"
                                 # will require idx for sub, sess and run
-    runs_pat = [pat_imgs_files.format(sub_idx, sess_idx, run_idx) 
+    runs_pat = [pat_imgs_files.format(sub_idx, sess_idx, run_idx) \
                                         for run_idx in range(1, nb_runs+1)]
                                 # careful : start idx at 1 requires nb_runs+1
     runs = [gb.glob(osp.join(dir_smooth_imgs, pat)) for pat in runs_pat]
@@ -177,30 +180,35 @@ def do_one_sess(sess_curr, sub_curr, params):
     for idx_run, run in enumerate(runs, 1): # start at 1;w
         run_curr['run_idx'] = idx_run
         run_curr['file_names'] = run
-        run_curr['motion'] = sess_param['motion'][idx_run]
+        run_curr['motion'] = sess_param['motion'][idx_run-1] # sess_param['motion'] is 0 based
 
         runs_info["run_{:02d}".format(idx_run)] = \
-                    do_one_run(run_curr, sess_curr, sub_curr, params)
+                    do_one_run(run_curr, sess_curr, sub_curr, params, verbose=verbose)
 
     return runs_info
 
-def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=1):
+def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     """
     """
     run_info = {}
     nvol = params['data_param']['nb_vol']
     dt = params['data_param']['TR']
+    nb_run = params['data_param']['nb_run']
 
     file_names = run_curr['file_names']
     run_idx = run_curr['run_idx']
+    run_idx0 = run_idx - 1
+    assert run_idx0 >= 0
+    assert run_idx0 < nb_run
+
     #sub_idx = sub_curr['sub_idx']
     #sess_idx = sess_curr['sess_idx']
     mvt_cond = run_curr['motion']
     dsig = sess_curr['dsig']
     mask = sess_curr['mask']
 
-    low_freq = params['analy_param']['low_freq']
-    high_freq = params['analy_param']['high_freq']
+    low_freq = params['analy_param']['filter']['low_freq']
+    high_freq = params['analy_param']['filter']['high_freq']
     
     # file names
     #---------------
@@ -224,7 +232,7 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=1):
                             sess_curr['csf_dir'], sess_curr['csf_filename'], 
                             run_4d, check_lengh=nvol, verbose=verbose)
     #--- get MVT
-    mvt_arr, mvt_labs = ucr.extract_mvt(sess_curr['mvtfile'], run_idx, nvol, 
+    mvt_arr, mvt_labs = ucr.extract_mvt(sess_curr['mvtfile'], run_idx0, nvol, 
                                                                 verbose=verbose)
     #--- get cosine functions;
     bf_arr, bf_labs = ucr.extract_bf(low_freq, high_freq, nvol, dt, 
@@ -236,6 +244,8 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=1):
        print("csf.shape {}, mvt.shape {}, bf.shape {}".format(
                      csf_arr.shape, mvt_arr.shape, bf_arr.shape))
     run_info['shapes'] = (csf_arr.shape, mvt_arr.shape, bf_arr.shape)
+    run_info['mean_csf'] = csf_arr.mean(axis=0)
+    run_info['mean_mvt'] = mvt_arr.mean(axis=0)
 
     # filter and compute correlation
     #-----------------------------------------------------
@@ -245,5 +255,3 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=1):
     np.savez(fn_fsig, arr_sig_f, labels_sig, arr_counf, labs_counf)
 
     return run_info
-
-
