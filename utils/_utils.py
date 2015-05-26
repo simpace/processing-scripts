@@ -106,7 +106,8 @@ def _create_bandpass_bf(npoint, dt, bandf, exclude=False):
 
 
 #- in the future : replace this by import the right version of nipy -#
-def _cosine_low_freq(period_cut, frametimes, verbose=False):
+def _cosine_low_freq(period_cut, frametimes, verbose=False, intercept=True, 
+                                                       norm_intercept=True):
     """Create a cosine drift matrix with periods greater or equals to period_cut
 
     Parameters
@@ -135,8 +136,16 @@ def _cosine_low_freq(period_cut, frametimes, verbose=False):
     
     for k in range(1, order):
         cdrift[:,k-1] = nfct * np.cos((np.pi/len_tim)*(n_times + .5)*k)
-    
-    cdrift[:,order-1] = 1. # or 1./sqrt(len_tim) to normalize
+
+    if intercept:
+        if norm_intercept:
+            cdrift[:,order-1] = 1./np.sqrt(len_tim) # to normalize
+        else:
+            cdrift[:,order-1] = 1. # or 1./sqrt(len_tim) to normalize
+    else:
+        # no intercept
+        cdrift = cdrift[:,:order-1]
+
     return cdrift
 
 def _cosine_high_freq(period_cut, frametimes, verbose=False):
