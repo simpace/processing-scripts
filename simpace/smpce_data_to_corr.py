@@ -8,31 +8,15 @@ from six import string_types
 #
 from nilearn import masking as msk
 from nilearn._utils import concat_niimgs
+# from nilearn.image.image import _compute_mean
 #
 import utils._utils as ucr
 import utils.setup_filenames as suf 
-
-SKIPVOL = 4
-RUNNBVOL = 200
-VOLNB = RUNNBVOL - SKIPVOL
-SUBNB = 1
-SUBNBstr = '{:02d}'.format(SUBNB) 
-TR = 2.0
+import argparse
 
 DIRLAYOUT = 'directory_layout.json'
 DATAPARAM = 'data_parameters.json'
 ANALPARAM = 'analysis_parameters.json'
-
-# from nilearn.image.image import _compute_mean
-
-
-def file_or_dir(dlo, basedir, action):
-    """
-    dlo: directory layout and patterns, specific 
-    """
-    pass
-
-
 
 def process_all(dbase, verbose=False):
     """
@@ -75,13 +59,13 @@ def process_all(dbase, verbose=False):
 
 def do_one_subject(sub_curr, params, verbose=False):
     """
-    Take the bdirectory at the moment subject
-    and launch sessions processing
+    launch sessions processing for sub_curr 
 
     parameters:
     -----------
-    sub_dir: string
-            subject base directory
+    sub_curr: dict 
+            contains subject base directory
+            contains subject index 
     params: dict
             parameters for layout, data and analysis
             
@@ -103,7 +87,16 @@ def do_one_subject(sub_curr, params, verbose=False):
     
 def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     """
-    """
+    launch runs processing for sess_curr 
+
+    parameters:
+    -----------
+    sess_curr: dict 
+            contains sess base directory
+            contains sess index 
+    params: dict
+            parameters for layout, data and analysis
+    """            
 
     sess_idx = sess_curr['sess_idx']
     sess_dir = sess_curr['sess_dir']
@@ -255,3 +248,33 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     np.savez(fn_fsig, arr_sig_f, labels_sig, arr_counf, labs_counf)
 
     return run_info
+
+#------------------------------------------------------------------------------
+# Running from command line
+#------------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    #
+    parser = argparse.ArgumentParser()
+
+    # Positional required arguments
+    help_base_dir = "The directory containing sub01/sess??/... and json files: \n" + \
+                    "analysis_parameters.json  data_parameters.json  directory_layout.json"
+    parser.add_argument("base_directory", help=help_base_dir)
+
+    # Optional arguments
+    parser.add_argument("--verbose", help="increase output verbosity", action="store_true")
+    args = parser.parse_args()
+    base_dir = args.base_directory
+    verbose = args.verbose
+    
+    print("launching analyses on :", base_dir)
+    assert osp.isdir(base_dir), '{} not a directory'.format(base_dir)
+
+    info = process_all(base_dir, verbose=verbose)
+   
+    if verbose:
+        print("\n------------------- Debug info ------------------ \n")
+        print(info)
+        print("\n------------------- Debug info ------------------ \n")
+
