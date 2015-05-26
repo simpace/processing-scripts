@@ -150,7 +150,11 @@ def do_one_sess(sess_curr, sub_curr, params):
     sess_curr['mask'] = sess_mask
     # TODO
     # check mask is reasonable - how ???
-    # store sess mask 
+    # store sess mask
+    dir_mask = osp.join(runs_dir, dlayo['dir']['runs_mask'])
+    suf.rm_and_create(dir_mask)
+    sess_mask.to_filename(osp.join(dir_mask, 'mask.nii'))
+    
     # compute_epi_mask(runs[0], opening=1, connected=True)
 
     # - mvt file
@@ -180,7 +184,6 @@ def do_one_sess(sess_curr, sub_curr, params):
 
     return runs_info
 
-#def do_one_run(file_names, idx_run, mask, verbose=1):
 def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=1):
     """
     """
