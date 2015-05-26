@@ -1,7 +1,9 @@
 {
 	"dir": {
 		"base": "./",
-		"sess": "sess{:02d}",
+		"sub+": "sub{:02d}",
+		"sess+": "sess{:02d}",
+		"run+": "run{:02d}",
 		"runs": "preproc",
 		"roi": "registered_files",
 		"signals": "extracted_signals",
@@ -9,16 +11,18 @@
 		"smooth": "smooth"
 	},
 	"pat": {
-		"sub": "*sub{:02d}_",
-		"sess": "*sess{:02d}_",
-		"run": "run{:02d}-",
-		"sess+run": "*sess{:02d}_run{:02d}-*",
-		"sub+sess+run": "*sub{:02d}_sess{:02d}_run{:02d}-*"
+		"sub+": "*sub{:02d}_",
+		"sess+": "*sess{:02d}_",
+		"run+": "*run{:02d}-",
+		"sub+sess+": "*sub{:02d}_sess{:02d}_",
+		"sess+run+": "*sess{:02d}_run{:02d}-",
+		"sub+sess+run+": "*sub{:02d}_sess{:02d}_run{:02d}-"
 	},
 	"spm": {
 		"mvtpref": "rp_",
 		"mvtpost": "00?.txt",
-		"mvtparam": "_rp_asub??_sess??_run{:02d}*-00*.txt"
+		"mvtprm": "_rp_asub??_sess??_run*-00*.txt",
+		"mvtprm+": "_rp_asub??_sess??_run{:02d}*-00*.txt"
 	},
 	"atlas": {
 		"pat": "rraal_*.nii"

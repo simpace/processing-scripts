@@ -1,0 +1,13 @@
+{
+	"filtering": {
+		"low_freq": 0.01,
+		"hig_freq": 0.1
+	},
+	"mvt_param": {
+		"6": true
+	},
+	"csf": {
+		"Yes": true
+	}
+}
+
