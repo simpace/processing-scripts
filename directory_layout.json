@@ -9,7 +9,7 @@
 		"signals": "extracted_signals",
 		"realign": "realign",
 		"smooth": "smooth",
-		"runs_mask": "mask"
+		"runs_mask": "runs_mask"
 	},
 	"pat": {
 		"sub+": "*sub{:02d}_",
