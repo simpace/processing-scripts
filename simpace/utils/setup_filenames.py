@@ -1,7 +1,6 @@
 """Script to setup dicom directories to standard format
 """
 
-MATLAB_INSTALLED = False
 
 import os, sys, stat
 import numpy as np
@@ -14,7 +13,10 @@ import dicom
 import shutil
 import tempfile
 from six import string_types
-if MATLAB_INSTALLED:
+
+# export MATLAB_INSTALLED=1 
+MATLAB_INSTALLED = os.environ.get('MATLAB_INSTALLED')
+if MATLAB_INSTALLED is not None:
     import nipype.interfaces.spm.utils as spmu
     import nipype.interfaces.matlab as matlab
 #
@@ -477,10 +479,10 @@ def main(argv = sys.argv):
         mot_order = get_motorder(runs_sort)
         
         #save params file
-        json_fname = pjoin(out_dir,'sub%02d_sess%02d_params' %(int(sub),sessidx+1))
+        json_fname = pjoin(out_dir,'sub%02d_sess%02d_params.json' %(int(sub),sessidx+1))
         params = dict(date = scan_date,
                       motion = mot_order)
-        with open(json_fname, 'w') as outfile:
+        with open(json_fname, 'wb') as outfile:
             json.dump(params, outfile)
 
         try:
