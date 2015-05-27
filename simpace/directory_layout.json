@@ -9,6 +9,7 @@
 		"signals": "extracted_signals",
 		"realign": "realign",
 		"smooth": "smooth",
+		"csf_mask": "rename_csf",
 		"runs_mask": "runs_mask"
 	},
 	"pat": {
@@ -27,6 +28,9 @@
 	},
 	"atlas": {
 		"pat": "rraal_*.nii"
+	},
+	"csf": {
+		"roi_mask": "csf_map.nii*"
 	}
 }
 
