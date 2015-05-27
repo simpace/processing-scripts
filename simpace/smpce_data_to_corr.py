@@ -4,7 +4,7 @@ import os.path as osp
 import glob as gb
 import json
 import numpy as np
-from six import string_types
+#from six import string_types
 #
 from nilearn import masking as msk
 from nilearn._utils import concat_niimgs
