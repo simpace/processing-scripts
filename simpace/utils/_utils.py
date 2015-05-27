@@ -238,7 +238,9 @@ def _get_and_sort_roi_files(rois_dir, roi_prefix):
     #print(roi_files)
 
     # fails if roi_files == []
-    assert roi_files, " roi_files empty {}".format(roi_files)
+    msg = " roi_files empty {}, from dir: {} and prefix {} ".format(
+                                roi_files, rois_dir, roi_prefix)
+    assert roi_files, msg 
     # sort the files to have some consistency in the behaviour
     roi_files.sort()
 
