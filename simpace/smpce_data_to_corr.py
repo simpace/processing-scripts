@@ -124,8 +124,11 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     dreal = osp.join(runs_dir, dlayo['dir']['realign'])
     sess_curr['dreal'] = dreal
 
+    csf_dir = dlayo['dir']['csf']
+    csf_file = osp.join(csf_dir, dlayo['csf']['roi_mask'])
     sess_curr['csf_dir'] = osp.join(runs_dir, 'csf_mask')
-    sess_curr['csf_filename'] =  'csf_map_final.nii.gz'
+    csf_file = suf._check_glob_res(csf_file, ensure=1, files_only=True)
+    sess_curr['csf_filename'] =  csf_file
 
     #- Get runs' filenames
     #------------------------
