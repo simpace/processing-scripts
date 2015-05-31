@@ -1,17 +1,22 @@
 {
+	"apply_sess_mask": true,
+	"apply_csf": true,
+	"apply_wm": true,
+	"apply_mvt": true,
+	"apply_filter": true,
+	"write_signals": true,
 	"filter": {
 		"low_freq": 0.01,
 		"high_freq": 0.1
 	},
-	"mvt_param": {
-		"6": true
+	"mvt": {
+		"type": "6" 
 	},
 	"csf": {
-		"Yes": true
+		"type": "mean" 
 	},
 	"wm": {
-		"Yes": true
-	},
-	"write_signals": true 
+		"type": "mean" 
+	}
 }
 
