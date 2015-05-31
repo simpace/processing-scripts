@@ -52,6 +52,9 @@ def process_all(dbase, params=None, verbose=False):
     """
     if not params:
         params = get_params(dbase, verbose=verbose)
+    
+    dlayo = params['layout']
+    ddata = params['data_param']
 
     # loop over subjects
     subj_idx = range(1,ddata['nb_sub']+1) # starts at 1, hence + 1
@@ -65,7 +68,8 @@ def process_all(dbase, params=None, verbose=False):
     for sub_idx, sub_dir in enumerate(subj_dirs, 1): # start idx at 1
         sub_curr['sub_idx'] = sub_idx
         sub_curr['sub_dir'] = sub_dir
-        subjs_info[sub_dir] =  do_one_subject(sub_curr, params, verbose=verbose) 
+        sub_str = (dlayo['dir']['sub+']).format(sub_idx)
+        subjs_info[sub_str] =  do_one_subject(sub_curr, params, verbose=verbose) 
 
     return subjs_info
 
@@ -93,7 +97,8 @@ def do_one_subject(sub_curr, params, verbose=False):
     for sess_idx, sess_dir in enumerate(sess_dirs, 1): # start idx at 1
         sess_curr['sess_idx'] = sess_idx
         sess_curr['sess_dir'] = sess_dir
-        sesss_info[sess_dir] = do_one_sess(sess_curr, sub_curr, params, verbose=verbose) 
+        sess_str = (dlayo['dir']['sess+']).format(sub_idx)
+        sesss_info[sess_str] = do_one_sess(sess_curr, sub_curr, params, verbose=verbose) 
 
     return sesss_info
     
@@ -124,58 +129,59 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     dir_smooth_imgs = osp.join(runs_dir, dlayo['dir']['smooth'])
     sess_curr['dir_smooth_imgs'] = dir_smooth_imgs
 
-    droi = osp.join(runs_dir, dlayo['dir']['roi']) # 'registered_files'
-    sess_curr['droi'] = droi
-    sess_curr['roi_prefix'] = 'rraal_*.nii' # TODO: should be at project level
-    
-    dsig = osp.join(runs_dir, dlayo['dir']['signals']) #'extracted_signals'
-    sess_curr['dsig'] = dsig
+    sess_curr['droi'] = osp.join(runs_dir, dlayo['atlas']['dir']) # 'registered_files'
+    sess_curr['roi_prefix'] = dlayo['atlas']['prepat']            # 'rraal_*.nii'     
+    sess_curr['dsig'] = osp.join(runs_dir, dlayo['out']['signals']['dir']) 
 
     save_is_true = params['analy_param']['write_signals']
     if save_is_true: 
         # rm existing and recreate signal directory
-        suf.rm_and_create(dsig)
+        suf.rm_and_create(sess_curr['dsig'])
 
-    dreal = osp.join(runs_dir, dlayo['dir']['realign'])
-    sess_curr['dreal'] = dreal
+    sess_curr['dreal'] = osp.join(runs_dir, dlayo['dir']['realign'])
 
-    csf_dir = dlayo['dir']['csf']
-    csf_file = osp.join(csf_dir, dlayo['csf']['roi_mask'])
-    sess_curr['csf_dir'] = osp.join(runs_dir, 'csf_mask')
+    #- csf dir and file
+    sess_curr['csf_dir'] = osp.join(runs_dir, dlayo['csf']['dir'])
+    csf_file = gb.glob(osp.join(sess_curr['csf_dir'], dlayo['csf']['roi_mask']))
     csf_file = suf._check_glob_res(csf_file, ensure=1, files_only=True)
     sess_curr['csf_filename'] =  csf_file
+
+    #- csf dir and file
+    sess_curr['wm_dir'] = osp.join(runs_dir, dlayo['wm']['dir'])
+    wm_file = gb.glob(osp.join(sess_curr['wm_dir'], dlayo['wm']['roi_mask']))
+    wm_file = suf._check_glob_res(wm_file, ensure=1, files_only=True)
+    sess_curr['wm_filename'] =  wm_file
 
     #- Get runs' filenames
     #------------------------
     pat_imgs_files = dlayo['pat']['sub+sess+run+']+"*.nii*"
-                                # will require idx for sub, sess and run
+                                # requires idx for sub, sess and run
     runs_pat = [pat_imgs_files.format(sub_idx, sess_idx, run_idx) \
                                         for run_idx in range(1, nb_runs+1)]
-                                # careful : start idx at 1 requires nb_runs+1
+                                # /!\  start idx at 1 requires nb_runs+1  /!\
     runs = [gb.glob(osp.join(dir_smooth_imgs, pat)) for pat in runs_pat]
+    # /!\ATTENTION:/!\ must sort the files with filename, should sort in time
     for run in runs: run.sort()
-    # ATTENTION: must sort the files - assume filenames will sort in time
     sess_curr['runs'] = runs
     
     # compute session wide mask
     #-----------------------------------------------------
+    # compute_epi_mask(runs[0], opening=1, connected=True)
     sess_mask = msk.compute_multi_epi_mask(runs, lower_cutoff=0.2, 
                     upper_cutoff=0.85, connected=True, opening=2, threshold=0.5)
     sess_curr['mask'] = sess_mask
     # TODO
     # check mask is reasonable - how ???
     # store sess mask
-    dir_mask = osp.join(runs_dir, dlayo['dir']['sess_mask'])
+    dir_mask = osp.join(runs_dir, dlayo['out']['sess_mask']['dir'])
     suf.rm_and_create(dir_mask)
-    sess_mask.to_filename(osp.join(dir_mask, dlayo['out']['sess_mask']))
-    
-    # compute_epi_mask(runs[0], opening=1, connected=True)
+    sess_mask.to_filename(osp.join(dir_mask, dlayo['out']['sess_mask']['roi_mask']))
 
     # - mvt file
     # example : mvtfile = osp.join(dreal,'rp_asub01_sess01_run01-0006.txt')
-    # will always be run01 for spm ?
+    # /!\ will always be run01 for spm /!\
     mvtpat = dlayo['spm_mvt']['mvtrun1+'].format(sub_idx, sess_idx) 
-    mvtfile = gb.glob(osp.join(dreal, mvtpat))
+    mvtfile = gb.glob(osp.join(sess_curr['dreal'], mvtpat))
     mvtfile = suf._check_glob_res(mvtfile, ensure=1, files_only=True)
     sess_curr['mvtfile'] = mvtfile
 
@@ -194,7 +200,7 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
         # TODO : fix this to have sess_param return motion['run1']='HIGH' etc
         run_curr['motion'] = sess_param['motion'][idx_run-1] # sess_param['motion'] is 0 based
 
-        runs_info["run_{:02d}".format(idx_run)] = \
+        runs_info["run{:02d}".format(idx_run)] = \
                     do_one_run(run_curr, sess_curr, sub_curr, params, verbose=verbose)
 
     return runs_info
@@ -224,8 +230,8 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     
     # signal file names
     #-------------------
-    _fn_sig = params['layout']['out']['signals+'] 
-    _fn_fsig = params['layout']['out']['f_signals+'] 
+    _fn_sig = params['layout']['out']['signals']['signals+'] 
+    _fn_fsig = params['layout']['out']['signals']['f_signals+'] 
     fn_sig = osp.join(dsig, _fn_sig.format(run_idx) + mvt_cond)
     fn_fsig = osp.join(dsig, _fn_fsig.format(run_idx)+mvt_cond)
 
