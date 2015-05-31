@@ -5,11 +5,9 @@
 		"sess+": "sess{:02d}",
 		"run+": "run{:02d}",
 		"runs": "preproc",
-		"roi": "registered_files",
 		"signals": "extracted_signals",
 		"realign": "realign",
-		"smooth": "smooth",
-		"sess_mask": "sess_mask"
+		"smooth": "smooth"
 	},
 	"pat": {
 		"sub+": "*sub{:02d}_",
@@ -25,13 +23,30 @@
 		"mvtprm": "rp_asub??_sess??_run*-00*.txt",
 		"mvtrun1+": "rp_asub{:02d}_sess{:02d}_run01-0*.txt"
 	},
+	"csf": {
+		"@dir": "@dir@runs@csf",
+		"dir": "csf_mask",
+		"roi_mask": "csf_map_final.nii*"
+	},
+	"wm": {
+		"@dir": "@dir@runs@wm",
+		"dir": "wm_mask",
+		"roi_mask": "wm_map_final.nii*"
+	},
 	"atlas": {
-		"pat": "rraal_*.nii"
+		"dir": "registered_files",
+		"prepat": "rraal_*.nii"
 	},
 	"out": {
-		"sess_mask": "sess_mask.nii",
-		"signals+": "signal_run{:02d}_",
-		"f_signals+": "filtered_signal_run{:02d}_"
+		"signals": {
+			"dir": "extracted_signals",
+			"signals+": "signal_run{:02d}_",
+			"f_signals+": "filtered_signal_run{:02d}_"
+		},
+		"sess_mask": {
+			"dir": "sess_mask",
+			"roi_mask": "sess_mask.nii"
+		}
 	}
 }
 
