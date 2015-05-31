@@ -173,9 +173,10 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
 
     runs_info = {}
     run_curr = {}
-    for idx_run, run in enumerate(runs, 1): # start at 1;w
+    for idx_run, run in enumerate(runs, 1): # /!\ starts at 1 /!\
         run_curr['run_idx'] = idx_run
         run_curr['file_names'] = run
+        # TODO : fix this to have sess_param return motion['run1']='HIGH' etc
         run_curr['motion'] = sess_param['motion'][idx_run-1] # sess_param['motion'] is 0 based
 
         runs_info["run_{:02d}".format(idx_run)] = \
@@ -219,7 +220,7 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
                                                   sess_curr['roi_prefix'], run_4d, 
                                                   mask=mask, minvox=1)   
     arr_sig, labels_sig = ucr._dict_signals_to_arr(signals)
-    np.savez(fn_sig, arr_sig, labels_sig) 
+    np.savez(fn_sig, arr_sig=arr_sig, labels_sig=labels_sig) 
 
     # construct matrix of counfounds
     #-----------------------------------------------------
@@ -248,7 +249,8 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     arr_sig_f = ucr.R_proj(arr_counf, arr_sig)
 
     # save filtered signals 
-    np.savez(fn_fsig, arr_sig_f, labels_sig, arr_counf, labs_counf)
+    np.savez(fn_fsig, arr_sig_f=arr_sig_f, labels_sig=labels_sig, 
+                      arr_counf=arr_counf, labs_counf=labs_counf)
 
     return run_info
 
