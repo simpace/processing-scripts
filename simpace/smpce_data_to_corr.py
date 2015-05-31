@@ -222,14 +222,19 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     low_freq = params['analy_param']['filter']['low_freq']
     high_freq = params['analy_param']['filter']['high_freq']
     
-    # file names
-    #---------------
-    # - signal files
+    # signal file names
+    #-------------------
     _fn_sig = params['layout']['out']['signals+'] 
     _fn_fsig = params['layout']['out']['f_signals+'] 
     fn_sig = osp.join(dsig, _fn_sig.format(run_idx) + mvt_cond)
     fn_fsig = osp.join(dsig, _fn_fsig.format(run_idx)+mvt_cond)
 
+    # extract signals and save them in preproc/roi_signals
+    #-----------------------------------------------------
+    run_4d = concat_niimgs(file_names, ensure_ndim=4)
+    signals, _issues, _info = ucr.extract_signals(sess_curr['droi'], 
+                                                  sess_curr['roi_prefix'], run_4d, 
+                                                  mask=mask, minvox=1)   
     # construct matrix of counfounds
     #-----------------------------------------------------
     #--- get WM 
@@ -254,16 +259,9 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     run_info['mean_csf'] = csf_arr.mean(axis=0)
     run_info['mean_mvt'] = mvt_arr.mean(axis=0)
 
-    # extract signals and save them in preproc/roi_signals
-    #-----------------------------------------------------
-    run_4d = concat_niimgs(file_names, ensure_ndim=4)
-    signals, _issues, _info = ucr.extract_signals(sess_curr['droi'], 
-                                                  sess_curr['roi_prefix'], run_4d, 
-                                                  mask=mask, minvox=1)   
-    arr_sig, labels_sig = ucr._dict_signals_to_arr(signals)
-
     # filter and compute correlation
     #-----------------------------------------------------
+    arr_sig, labels_sig = ucr._dict_signals_to_arr(signals)
     arr_sig_f = ucr.R_proj(arr_counf, arr_sig)
 
     # save filtered signals 
