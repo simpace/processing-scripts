@@ -8,6 +8,10 @@
 	},
 	"csf": {
 		"Yes": true
-	}
+	},
+	"wm": {
+		"Yes": true
+	},
+	"write_signals": true 
 }
 

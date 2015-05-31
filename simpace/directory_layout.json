@@ -9,8 +9,7 @@
 		"signals": "extracted_signals",
 		"realign": "realign",
 		"smooth": "smooth",
-		"csf": "rename_csf",
-		"runs_mask": "runs_mask"
+		"sess_mask": "sess_mask"
 	},
 	"pat": {
 		"sub+": "*sub{:02d}_",
@@ -20,17 +19,19 @@
 		"sess+run+": "*sess{:02d}_run{:02d}-",
 		"sub+sess+run+": "*sub{:02d}_sess{:02d}_run{:02d}-"
 	},
-	"spm": {
+	"spm_mvt": {
 		"mvtpref": "rp_",
 		"mvtpost": "00?.txt",
-		"mvtprm": "_rp_asub??_sess??_run*-00*.txt",
-		"mvtprm+": "_rp_asub??_sess??_run{:02d}*-00*.txt"
+		"mvtprm": "rp_asub??_sess??_run*-00*.txt",
+		"mvtrun1+": "rp_asub{:02d}_sess{:02d}_run01-0*.txt"
 	},
 	"atlas": {
 		"pat": "rraal_*.nii"
 	},
-	"csf": {
-		"roi_mask": "csf_map.nii*"
+	"out": {
+		"sess_mask": "sess_mask.nii",
+		"signals+": "signal_run{:02d}_",
+		"f_signals+": "filtered_signal_run{:02d}_"
 	}
 }
 

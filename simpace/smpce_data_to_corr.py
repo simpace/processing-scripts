@@ -18,7 +18,7 @@ DIRLAYOUT = 'directory_layout.json'
 DATAPARAM = 'data_parameters.json'
 ANALPARAM = 'analysis_parameters.json'
 
-def process_all(dbase, verbose=False):
+def get_params(dbase, verbose=False):
     """
     parameters:
     -----------
@@ -40,6 +40,18 @@ def process_all(dbase, verbose=False):
         danal = json.load(fanal)
 
     params = {'layout': dlayo, 'data_param': ddata, 'analy_param': danal}
+    return params
+
+def process_all(dbase, params=None, verbose=False):
+    """
+    parameters:
+    -----------
+    dbase:  string
+            base directory containing subjects directory
+            and jason files
+    """
+    if not params:
+        params = get_params(dbase, verbose=verbose)
 
     # loop over subjects
     subj_idx = range(1,ddata['nb_sub']+1) # starts at 1, hence + 1
@@ -118,8 +130,11 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     
     dsig = osp.join(runs_dir, dlayo['dir']['signals']) #'extracted_signals'
     sess_curr['dsig'] = dsig
-    # rm existing and recreate signal directory
-    suf.rm_and_create(dsig)
+
+    save_is_true = params['analy_param']['write_signals']
+    if save_is_true: 
+        # rm existing and recreate signal directory
+        suf.rm_and_create(dsig)
 
     dreal = osp.join(runs_dir, dlayo['dir']['realign'])
     sess_curr['dreal'] = dreal
@@ -150,16 +165,16 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     # TODO
     # check mask is reasonable - how ???
     # store sess mask
-    dir_mask = osp.join(runs_dir, dlayo['dir']['runs_mask'])
+    dir_mask = osp.join(runs_dir, dlayo['dir']['sess_mask'])
     suf.rm_and_create(dir_mask)
-    sess_mask.to_filename(osp.join(dir_mask, 'mask.nii'))
+    sess_mask.to_filename(osp.join(dir_mask, dlayo['out']['sess_mask']))
     
     # compute_epi_mask(runs[0], opening=1, connected=True)
 
     # - mvt file
     # example : mvtfile = osp.join(dreal,'rp_asub01_sess01_run01-0006.txt')
     # will always be run01 for spm ?
-    mvtpat = ('rp_asub{:02d}_sess{:02d}_run01' + '*-00*.txt').format(sub_idx, sess_idx) 
+    mvtpat = dlayo['spm_mvt']['mvtrun1+'].format(sub_idx, sess_idx) 
     mvtfile = gb.glob(osp.join(dreal, mvtpat))
     mvtfile = suf._check_glob_res(mvtfile, ensure=1, files_only=True)
     sess_curr['mvtfile'] = mvtfile
@@ -210,20 +225,15 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     # file names
     #---------------
     # - signal files
-    fn_sig = osp.join(dsig, 'signal_run{:02d}_'.format(run_idx) + mvt_cond)
-    fn_fsig = osp.join(dsig, 'filtered_signal_run{:02d}_'.format(run_idx)+mvt_cond)
-
-    # extract signals and save them in preproc/roi_signals
-    #-----------------------------------------------------
-    run_4d = concat_niimgs(file_names, ensure_ndim=4)
-    signals, _issues, _info = ucr.extract_signals(sess_curr['droi'], 
-                                                  sess_curr['roi_prefix'], run_4d, 
-                                                  mask=mask, minvox=1)   
-    arr_sig, labels_sig = ucr._dict_signals_to_arr(signals)
-    np.savez(fn_sig, arr_sig=arr_sig, labels_sig=labels_sig) 
+    _fn_sig = params['layout']['out']['signals+'] 
+    _fn_fsig = params['layout']['out']['f_signals+'] 
+    fn_sig = osp.join(dsig, _fn_sig.format(run_idx) + mvt_cond)
+    fn_fsig = osp.join(dsig, _fn_fsig.format(run_idx)+mvt_cond)
 
     # construct matrix of counfounds
     #-----------------------------------------------------
+    #--- get WM 
+
     #--- get CSF
     csf_arr, csf_labs = ucr.extract_roi_run(
                             sess_curr['csf_dir'], sess_curr['csf_filename'], 
@@ -244,13 +254,28 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     run_info['mean_csf'] = csf_arr.mean(axis=0)
     run_info['mean_mvt'] = mvt_arr.mean(axis=0)
 
+    # extract signals and save them in preproc/roi_signals
+    #-----------------------------------------------------
+    run_4d = concat_niimgs(file_names, ensure_ndim=4)
+    signals, _issues, _info = ucr.extract_signals(sess_curr['droi'], 
+                                                  sess_curr['roi_prefix'], run_4d, 
+                                                  mask=mask, minvox=1)   
+    arr_sig, labels_sig = ucr._dict_signals_to_arr(signals)
+
     # filter and compute correlation
     #-----------------------------------------------------
     arr_sig_f = ucr.R_proj(arr_counf, arr_sig)
 
     # save filtered signals 
-    np.savez(fn_fsig, arr_sig_f=arr_sig_f, labels_sig=labels_sig, 
+    save_is_true = params['analy_param']['write_signals']
+    if save_is_true:
+        np.savez(fn_sig, arr_sig=arr_sig, labels_sig=labels_sig) 
+        np.savez(fn_fsig, arr_sig_f=arr_sig_f, labels_sig=labels_sig, 
                       arr_counf=arr_counf, labs_counf=labs_counf)
+    else:
+        run_info['signals'] = signals
+        run_info['f_signals'] = dict(arr_sig_f=arr_sig_f, labels_sig=labels_sig,
+                                     arr_counf=arr_counf, labs_counf=labs_counf)
 
     return run_info
 
@@ -276,7 +301,7 @@ if __name__ == "__main__":
     print("launching analyses on :", base_dir)
     assert osp.isdir(base_dir), '{} not a directory'.format(base_dir)
 
-    info = process_all(base_dir, verbose=verbose)
+    info = process_all(base_dir, params=None, verbose=verbose)
    
     if verbose:
         print("\n------------------- Debug info ------------------ \n")
