@@ -39,7 +39,7 @@ def get_params(dbase, verbose=False):
     with open(fn_anal) as fanal:
         danal = json.load(fanal)
 
-    params = {'layout': dlayo, 'data_param': ddata, 'analy_param': danal}
+    params = {'layout': dlayo, 'data': ddata, 'analysis': danal}
     return params
 
 def process_all(dbase, params=None, verbose=False):
@@ -54,7 +54,7 @@ def process_all(dbase, params=None, verbose=False):
         params = get_params(dbase, verbose=verbose)
     
     dlayo = params['layout']
-    ddata = params['data_param']
+    ddata = params['data']
 
     # loop over subjects
     subj_idx = range(1,ddata['nb_sub']+1) # starts at 1, hence + 1
@@ -87,7 +87,7 @@ def do_one_subject(sub_curr, params, verbose=False):
             
     """
     sub_idx, sub_dir = sub_curr['sub_idx'], sub_curr['sub_dir']
-    nb_sess = params['data_param']['nb_sess']
+    nb_sess = params['data']['nb_sess']
     dlayo = params['layout']
     sess_idx = range(1, nb_sess+1)
     sess_dirs = [osp.join(sub_dir, (dlayo['dir']['sess+']).format(idx)) for idx in sess_idx]
@@ -118,7 +118,7 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     sess_idx = sess_curr['sess_idx']
     sess_dir = sess_curr['sess_dir']
     sub_idx = sub_curr['sub_idx']
-    nb_runs = params['data_param']['nb_run'] 
+    nb_runs = params['data']['nb_run'] 
     assert nb_runs == 4 # 4debug
 
     dlayo = params['layout']
@@ -133,7 +133,7 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     sess_curr['roi_prefix'] = dlayo['atlas']['prepat']            # 'rraal_*.nii'     
     sess_curr['dsig'] = osp.join(runs_dir, dlayo['out']['signals']['dir']) 
 
-    save_is_true = params['analy_param']['write_signals']
+    save_is_true = params['analysis']['write_signals']
     if save_is_true: 
         # rm existing and recreate signal directory
         suf.rm_and_create(sess_curr['dsig'])
@@ -167,15 +167,19 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     # compute session wide mask
     #-----------------------------------------------------
     # compute_epi_mask(runs[0], opening=1, connected=True)
-    sess_mask = msk.compute_multi_epi_mask(runs, lower_cutoff=0.2, 
+    if params['analysis']['apply_sess_mask']:
+        sess_mask = msk.compute_multi_epi_mask(runs, lower_cutoff=0.2, 
                     upper_cutoff=0.85, connected=True, opening=2, threshold=0.5)
+        # store sess mask
+        dir_mask = osp.join(runs_dir, dlayo['out']['sess_mask']['dir'])
+        suf.rm_and_create(dir_mask)
+        sess_mask.to_filename(osp.join(dir_mask, dlayo['out']['sess_mask']['roi_mask']))
+    else:
+        sess_mask = None
     sess_curr['mask'] = sess_mask
+
     # TODO
     # check mask is reasonable - how ???
-    # store sess mask
-    dir_mask = osp.join(runs_dir, dlayo['out']['sess_mask']['dir'])
-    suf.rm_and_create(dir_mask)
-    sess_mask.to_filename(osp.join(dir_mask, dlayo['out']['sess_mask']['roi_mask']))
 
     # - mvt file
     # example : mvtfile = osp.join(dreal,'rp_asub01_sess01_run01-0006.txt')
@@ -209,9 +213,9 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     """
     """
     run_info = {}
-    nvol = params['data_param']['nb_vol']
-    dt = params['data_param']['TR']
-    nb_run = params['data_param']['nb_run']
+    nvol = params['data']['nb_vol']
+    dt = params['data']['TR']
+    nb_run = params['data']['nb_run']
 
     file_names = run_curr['file_names']
     run_idx = run_curr['run_idx']
@@ -225,8 +229,8 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     dsig = sess_curr['dsig']
     mask = sess_curr['mask']
 
-    low_freq = params['analy_param']['filter']['low_freq']
-    high_freq = params['analy_param']['filter']['high_freq']
+    low_freq = params['analysis']['filter']['low_freq']
+    high_freq = params['analysis']['filter']['high_freq']
     
     # signal file names
     #-------------------
@@ -271,13 +275,14 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     arr_sig_f = ucr.R_proj(arr_counf, arr_sig)
 
     # save filtered signals 
-    save_is_true = params['analy_param']['write_signals']
+    save_is_true = params['analysis']['write_signals']
     if save_is_true:
         np.savez(fn_sig, arr_sig=arr_sig, labels_sig=labels_sig) 
         np.savez(fn_fsig, arr_sig_f=arr_sig_f, labels_sig=labels_sig, 
                       arr_counf=arr_counf, labs_counf=labs_counf)
     else:
-        run_info['signals'] = signals
+        run_info['signals'] = dict(arr_sig=arr_sig, labels_sig=labels_sig, 
+                                    issues=_issues, info=_info)
         run_info['f_signals'] = dict(arr_sig_f=arr_sig_f, labels_sig=labels_sig,
                                      arr_counf=arr_counf, labs_counf=labs_counf)
 
