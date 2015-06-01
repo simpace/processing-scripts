@@ -144,13 +144,13 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     sess_curr['csf_dir'] = osp.join(runs_dir, dlayo['csf']['dir'])
     csf_file = gb.glob(osp.join(sess_curr['csf_dir'], dlayo['csf']['roi_mask']))
     csf_file = suf._check_glob_res(csf_file, ensure=1, files_only=True)
-    sess_curr['csf_filename'] =  csf_file
+    sess_curr['csf_filename'] =  dlayo['csf']['roi_mask']
 
     #- wm dir and file
     sess_curr['wm_dir'] = osp.join(runs_dir, dlayo['wm']['dir'])
     wm_file = gb.glob(osp.join(sess_curr['wm_dir'], dlayo['wm']['roi_mask']))
     wm_file = suf._check_glob_res(wm_file, ensure=1, files_only=True)
-    sess_curr['wm_filename'] =  wm_file
+    sess_curr['wm_filename'] =  dlayo['wm']['roi_mask']
 
     #- Get runs' filenames
     #------------------------
