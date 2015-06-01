@@ -146,7 +146,7 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     csf_file = suf._check_glob_res(csf_file, ensure=1, files_only=True)
     sess_curr['csf_filename'] =  csf_file
 
-    #- csf dir and file
+    #- wm dir and file
     sess_curr['wm_dir'] = osp.join(runs_dir, dlayo['wm']['dir'])
     wm_file = gb.glob(osp.join(sess_curr['wm_dir'], dlayo['wm']['roi_mask']))
     wm_file = suf._check_glob_res(wm_file, ensure=1, files_only=True)
@@ -248,6 +248,9 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     # construct matrix of counfounds
     #-----------------------------------------------------
     #--- get WM 
+    wm_arr, wm_labs = ucr.extract_roi_run(
+                            sess_curr['wm_dir'], sess_curr['wm_filename'], 
+                            run_4d, check_lengh=nvol, verbose=verbose)
 
     #--- get CSF
     csf_arr, csf_labs = ucr.extract_roi_run(
@@ -260,19 +263,27 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     bf_arr, bf_labs = ucr.extract_bf(low_freq, high_freq, nvol, dt, 
                                                                 verbose=verbose)
     #--- put it together  
-    arr_counf = np.hstack((csf_arr, mvt_arr, bf_arr))
-    labs_counf = csf_labs + mvt_labs + bf_labs
+    arr_counf = np.hstack((wm_arr, csf_arr, mvt_arr, bf_arr))
+    labs_counf = wm_labs + csf_labs + mvt_labs + bf_labs
+    
     if verbose:
-       print("csf.shape {}, mvt.shape {}, bf.shape {}".format(
-                     csf_arr.shape, mvt_arr.shape, bf_arr.shape))
-    run_info['shapes'] = (csf_arr.shape, mvt_arr.shape, bf_arr.shape)
-    run_info['mean_csf'] = csf_arr.mean(axis=0)
-    run_info['mean_mvt'] = mvt_arr.mean(axis=0)
+       print("wm.shape {}, csf.shape {}, mvt.shape {}, bf.shape {}".format(
+                     wm_arr.shape, csf_arr.shape, mvt_arr.shape, bf_arr.shape))
+    run_info['shapes'] = (wm_arr.shape, csf_arr.shape, mvt_arr.shape, bf_arr.shape)
+    #run_info['mean_csf'] = csf_arr.mean(axis=0)
+    #run_info['mean_mvt'] = mvt_arr.mean(axis=0)
 
     # filter and compute correlation
     #-----------------------------------------------------
     arr_sig, labels_sig = ucr._dict_signals_to_arr(signals)
     arr_sig_f = ucr.R_proj(arr_counf, arr_sig)
+    corr_sig_f = np.corrcoef(arr_sig_f.T)
+
+    run_info['signals'] = dict(arr_sig=arr_sig, labels_sig=labels_sig, 
+                                issues=_issues, info=_info)
+    run_info['f_signals'] = dict(arr_sig_f=arr_sig_f, labels_sig=labels_sig,
+                                 arr_counf=arr_counf, labs_counf=labs_counf,
+                                 corr_sig_f=corr_sig_f)
 
     # save filtered signals 
     save_is_true = params['analysis']['write_signals']
@@ -280,11 +291,6 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
         np.savez(fn_sig, arr_sig=arr_sig, labels_sig=labels_sig) 
         np.savez(fn_fsig, arr_sig_f=arr_sig_f, labels_sig=labels_sig, 
                       arr_counf=arr_counf, labs_counf=labs_counf)
-    else:
-        run_info['signals'] = dict(arr_sig=arr_sig, labels_sig=labels_sig, 
-                                    issues=_issues, info=_info)
-        run_info['f_signals'] = dict(arr_sig_f=arr_sig_f, labels_sig=labels_sig,
-                                     arr_counf=arr_counf, labs_counf=labs_counf)
 
     return run_info
 

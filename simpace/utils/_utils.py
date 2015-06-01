@@ -351,14 +351,14 @@ def _dict_signals_to_arr(dsig, verbose=False):
     assert dsig[_keys[0]].ndim == 1, "dsig[_keys[0]].ndim != 1"
 
     # check all the same size
-    t = dsig[_keys[0]].shape[0]
+    t = dsig[_keys[0]].shape[0] # t: time dimension
     all_t = np.asarray([dsig[k].shape[0] for k in _keys]) - t
     all_shp1 = np.asarray([dsig[k].ndim for k in _keys]) 
     all_shp1 -= all_shp1[0]
     assert not any(all_t)
     assert not any(all_shp1)
 
-    n = len(_keys)
+    n = len(_keys) # roi dimension
     if verbose: print(" {} regions, {} time {} dtype".format(n,t, 
                                                 dsig[_keys[0]].dtype))
     arr = np.zeros((t, n), dtype=dsig[_keys[0]].dtype)
@@ -441,26 +441,50 @@ def extract_mvt(mvtfile, run_idx, run_len, standardize=True, verbose=False):
 
     return mvt_arr, mvt_labs
 
-def extract_roi_run(dcsf, csf_filename, run_4d, check_lengh=None,
+# - def extract_csf_run(dcsf, csf_filename, run_4d, check_lengh=None,
+# -         standardize=True, verbose=False):
+# - 
+# -     #--- get CSF----------#
+# -     csf_signals, csf_issues, csf_info = \
+# -                     extract_signals(dcsf, csf_filename, run_4d)
+# - 
+# -     #- check csf_signals ok ?
+# -     assert len(csf_signals) == 1 # only one signal in dict
+# -     csf_arr = csf_signals[csf_signals.keys()[0]]
+# -     if check_lengh is not None:
+# -         assert csf_arr.shape == (check_lengh,)
+# - 
+# -     # standardized csf_arr
+# -     if standardize:
+# -         csf_arr = _standardize(csf_arr.reshape(csf_arr.shape[0], 1), 
+# -                                 verbose=verbose)
+# -     csf_labs = ['csf']
+# -     
+# -     return csf_arr, csf_labs
+
+def extract_roi_run(droi, roi_filename, run_4d, check_lengh=None,
         standardize=True, verbose=False):
 
-    #--- get CSF----------#
-    csf_signals, csf_issues, csf_info = \
-                    extract_signals(dcsf, csf_filename, run_4d)
+    #--- get roi----------#
+    roi_signals, roi_issues, roi_info = \
+                    extract_signals(droi, roi_filename, run_4d)
 
-    #- check csf_signals ok ?
-    assert len(csf_signals) == 1 # only one signal in dict
-    csf_arr = csf_signals[csf_signals.keys()[0]]
+    #- check roi_signals ok ?
+    assert len(roi_signals) == 1 # only one signal in dict
+    roi_key = roi_signals.keys()[0]
+    roi_arr = roi_signals[roi_key]
     if check_lengh is not None:
-        assert csf_arr.shape == (check_lengh,)
+        assert roi_arr.shape == (check_lengh,)
 
-    # standardized csf_arr
+    # standardized roi_arr
     if standardize:
-        csf_arr = _standardize(csf_arr.reshape(csf_arr.shape[0], 1), 
+        roi_arr = _standardize(roi_arr.reshape(roi_arr.shape[0], 1), 
                                 verbose=verbose)
-    csf_labs = ['csf']
+    roi_labs = [roi_key]
     
-    return csf_arr, csf_labs
+    return roi_arr, roi_labs
+
+
 
 def extract_bf(low_freq, high_freq, volnb, dt, verbose=False):
     #--- get cosine functions; ----------#
