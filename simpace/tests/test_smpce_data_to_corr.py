@@ -6,8 +6,8 @@ from numpy.testing import assert_allclose #, assert_array_equal
 import os.path as osp
 import glob as gb
 from ..smpce_data_to_corr import get_params, process_all
-import utils._utils as ucr 
-import utils.setup_filenames as suf
+from ..utils import _utils as ucr
+from ..utils import setup_filenames as suf
 from nilearn._utils import concat_niimgs
 
 BASEDIR_JB = '/home/jb/data/simpace/data/rename_files'
@@ -64,6 +64,7 @@ def _get_smpace_processing_data():
     # modify params to not write signals
     params['analysis']['write_signals'] = False
     params['analysis']['apply_sess_mask'] = False
+    params['data']['nb_sess'] = 1
     nb_runs = 4
 
     # get signals, info 
