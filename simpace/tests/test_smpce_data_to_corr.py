@@ -118,6 +118,8 @@ def test_csf_extracted_signal():
     csf_dir = osp.join(runs_dir, dlayo['csf']['dir'])
     #print(csf_dir, ' + pat ', dlayo['csf']['roi_mask'])
     csf_file = gb.glob(osp.join(csf_dir, dlayo['csf']['roi_mask']))
+    if not csf_file: print("glob empty: {} {}".format(
+                                csf_dir, dlayo['csf']['roi_mask']))
     csf_file = suf._check_glob_res(csf_file, ensure=1, files_only=True)
 
     dir_smooth_imgs = osp.join(runs_dir, dlayo['dir']['smooth'])   
@@ -129,7 +131,6 @@ def test_csf_extracted_signal():
     runs = [gb.glob(osp.join(dir_smooth_imgs, pat)) for pat in runs_pat]
     for run in runs: run.sort()
 
-    
     #print("csf_file : ", csf_file)
     #print("csf_dir : ", csf_dir)
     #print("dir_smooth_imgs : ", dir_smooth_imgs)

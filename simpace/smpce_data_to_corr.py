@@ -98,6 +98,7 @@ def do_one_subject(sub_curr, params, verbose=False):
         sess_curr['sess_idx'] = sess_idx
         sess_curr['sess_dir'] = sess_dir
         sess_str = (dlayo['dir']['sess+']).format(sub_idx)
+        if verbose: print('\n' + '---'*11  + "\n" + sess_str)
         sesss_info[sess_str] = do_one_sess(sess_curr, sub_curr, params, verbose=verbose) 
 
     return sesss_info
@@ -143,12 +144,16 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     #- csf dir and file
     sess_curr['csf_dir'] = osp.join(runs_dir, dlayo['csf']['dir'])
     csf_file = gb.glob(osp.join(sess_curr['csf_dir'], dlayo['csf']['roi_mask']))
+    if not csf_file: print("glob empty: {} {}".format(
+                                sess_curr['csf_dir'], dlayo['csf']['roi_mask']))
     csf_file = suf._check_glob_res(csf_file, ensure=1, files_only=True)
     sess_curr['csf_filename'] =  dlayo['csf']['roi_mask']
 
     #- wm dir and file
     sess_curr['wm_dir'] = osp.join(runs_dir, dlayo['wm']['dir'])
     wm_file = gb.glob(osp.join(sess_curr['wm_dir'], dlayo['wm']['roi_mask']))
+    if not wm_file: print("glob empty: {} {}".format(
+                                sess_curr['wm_dir'], dlayo['wm']['roi_mask']))
     wm_file = suf._check_glob_res(wm_file, ensure=1, files_only=True)
     sess_curr['wm_filename'] =  dlayo['wm']['roi_mask']
 
