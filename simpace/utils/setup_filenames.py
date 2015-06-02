@@ -300,8 +300,8 @@ def _check_glob_res(res, ensure=None, files_only=True):
 
     if isinstance(res, list):
         if ensure is not None:
-            assert len(res) == ensure, " len(res) {} != ensure {}".format(
-                                         len(res), ensure)
+            assert len(res) == ensure, "res: {} len(res) {} != ensure {}".format(
+                                        res, len(res), ensure)
         if files_only:
             for f in res:
                 assert osp.isfile(f), " {} is not a file".format(f)

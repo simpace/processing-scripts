@@ -235,9 +235,9 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     # signal file names
     #-------------------
     _fn_sig = params['layout']['out']['signals']['signals+'] 
-    _fn_fsig = params['layout']['out']['signals']['f_signals+'] 
+    # _fn_fsig = params['layout']['out']['signals']['f_signals+'] 
     fn_sig = osp.join(dsig, _fn_sig.format(run_idx) + mvt_cond)
-    fn_fsig = osp.join(dsig, _fn_fsig.format(run_idx)+mvt_cond)
+    # fn_fsig = osp.join(dsig, _fn_fsig.format(run_idx)+mvt_cond)
 
     # extract signals and save them in preproc/roi_signals
     #-----------------------------------------------------
@@ -269,28 +269,26 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     if verbose:
        print("wm.shape {}, csf.shape {}, mvt.shape {}, bf.shape {}".format(
                      wm_arr.shape, csf_arr.shape, mvt_arr.shape, bf_arr.shape))
-    run_info['shapes'] = (wm_arr.shape, csf_arr.shape, mvt_arr.shape, bf_arr.shape)
+    #run_info['shapes'] = (wm_arr.shape, csf_arr.shape, mvt_arr.shape, bf_arr.shape)
     #run_info['mean_csf'] = csf_arr.mean(axis=0)
     #run_info['mean_mvt'] = mvt_arr.mean(axis=0)
 
-    # filter and compute correlation
+    # filter and save 
     #-----------------------------------------------------
     arr_sig, labels_sig = ucr._dict_signals_to_arr(signals)
     arr_sig_f = ucr.R_proj(arr_counf, arr_sig)
-    corr_sig_f = np.corrcoef(arr_sig_f.T)
 
-    run_info['signals'] = dict(arr_sig=arr_sig, labels_sig=labels_sig, 
-                                issues=_issues, info=_info)
-    run_info['f_signals'] = dict(arr_sig_f=arr_sig_f, labels_sig=labels_sig,
-                                 arr_counf=arr_counf, labs_counf=labs_counf,
-                                 corr_sig_f=corr_sig_f)
+    run_info = dict(arr_sig=arr_sig, labels_sig=labels_sig, issues=_issues, 
+                    info=_info, arr_sig_f=arr_sig_f, arr_counf=arr_counf, 
+                    labs_counf=labs_counf)
 
     # save filtered signals 
     save_is_true = params['analysis']['write_signals']
     if save_is_true:
-        np.savez(fn_sig, arr_sig=arr_sig, labels_sig=labels_sig) 
-        np.savez(fn_fsig, arr_sig_f=arr_sig_f, labels_sig=labels_sig, 
-                      arr_counf=arr_counf, labs_counf=labs_counf)
+        np.savez(fn_sig, arr_sig=arr_sig, labels_sig=labels_sig, 
+                                issues=_issues, info=_info, arr_sig_f=arr_sig_f,
+                                arr_counf=arr_counf, labs_counf=labs_counf) 
+        #np.savez(fn_fsig, arr_sig_f=arr_sig_f, arr_counf=arr_counf, labs_counf=labs_counf)
 
     return run_info
 
