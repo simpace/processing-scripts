@@ -286,8 +286,8 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     save_is_true = params['analysis']['write_signals']
     if save_is_true:
         np.savez(fn_sig, arr_sig=arr_sig, labels_sig=labels_sig, 
-                                issues=_issues, info=_info, arr_sig_f=arr_sig_f,
-                                arr_counf=arr_counf, labs_counf=labs_counf) 
+                         issues=_issues, info=_info, arr_sig_f=arr_sig_f,
+                         arr_counf=arr_counf, labs_counf=labs_counf, params=params) 
         #np.savez(fn_fsig, arr_sig_f=arr_sig_f, arr_counf=arr_counf, labs_counf=labs_counf)
 
     return run_info

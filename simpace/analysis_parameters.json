@@ -7,7 +7,7 @@
 	"write_signals": true,
 	"filter": {
 		"low_freq": 0.01,
-		"high_freq": 0.1
+		"high_freq": 0.08
 	},
 	"mvt": {
 		"type": "6" 
