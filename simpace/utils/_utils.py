@@ -255,7 +255,13 @@ def _yield_roi_mask(roi_files, imgdim=3, roi_threshold=0.5):
     """
 
     for fn_roi in roi_files:
-        label = osp.splitext(osp.basename(fn_roi))[0]
+        # remove .gz if exists
+        label = fn_roi
+        if label[-3:] == '.gz':
+            label = label[:-3]
+        # remove extension
+        label = osp.splitext(osp.basename(label))[0]
+
         img = nib.load(fn_roi)
         # may need to clean up the Nans or other to get rid of warning?
         roi_mask = np.asarray(img.get_data().astype(float) > roi_threshold)
@@ -272,6 +278,7 @@ def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None,
     -----------
     rois_dir: str
     roi_prefix: str
+        pattern for files, should not contain directory
     fn_img4d: str or img
     mask: str or nibabel image
     minvox: minimum number of voxel in sampled region
