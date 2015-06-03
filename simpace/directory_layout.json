@@ -40,7 +40,7 @@
 	"out": {
 		"signals": {
 			"dir": "extracted_signals",
-			"signals+": "signal_sess_{:02d}_run{:02d}_",
+			"signals+": "signal_sess{:02d}_run{:02d}_",
 			"f_signals+": "filtered_signal_sess_{:02d}_run{:02d}_"
 		},
 		"sess_mask": {
