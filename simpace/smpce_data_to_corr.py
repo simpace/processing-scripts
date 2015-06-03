@@ -229,7 +229,7 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     assert run_idx0 < nb_run
 
     #sub_idx = sub_curr['sub_idx']
-    #sess_idx = sess_curr['sess_idx']
+    sess_idx = sess_curr['sess_idx']
     mvt_cond = run_curr['motion']
     dsig = sess_curr['dsig']
     mask = sess_curr['mask']
@@ -241,7 +241,7 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     #-------------------
     _fn_sig = params['layout']['out']['signals']['signals+'] 
     # _fn_fsig = params['layout']['out']['signals']['f_signals+'] 
-    fn_sig = osp.join(dsig, _fn_sig.format(run_idx) + mvt_cond)
+    fn_sig = osp.join(dsig, _fn_sig.format(sess_idx, run_idx) + mvt_cond)
     # fn_fsig = osp.join(dsig, _fn_fsig.format(run_idx)+mvt_cond)
 
     # extract signals and save them in preproc/roi_signals
