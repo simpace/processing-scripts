@@ -206,6 +206,7 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     for idx_run, run in enumerate(runs, 1): # /!\ starts at 1 /!\
         run_curr['run_idx'] = idx_run
         run_curr['file_names'] = run
+        if verbose: print('\n' + '---'*9  + "\n" + "run{:02d}".format(idx_run))
         # TODO : fix this to have sess_param return motion['run1']='HIGH' etc
         run_curr['motion'] = sess_param['motion'][idx_run-1] # sess_param['motion'] is 0 based
 
@@ -252,23 +253,50 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
                                                   mask=mask, minvox=1)   
     # construct matrix of counfounds
     #-----------------------------------------------------
+    arr_counf = []
+    labs_counf = []
     #--- get WM 
-    wm_arr, wm_labs = ucr.extract_roi_run(
+    if params['analysis']['apply_wm']:
+        wm_arr, wm_labs = ucr.extract_roi_run(
                             sess_curr['wm_dir'], sess_curr['wm_filename'], 
                             run_4d, check_lengh=nvol, verbose=verbose)
-
+        labs_counf = labs_counf + wm_labs
+        arr_counf.append(wm_arr)
+        if verbose: print("applying wm \n")
+    else: 
+        wm_arr, wm_labs = None, None   
     #--- get CSF
-    csf_arr, csf_labs = ucr.extract_roi_run(
+    if params['analysis']['apply_csf']:
+        csf_arr, csf_labs = ucr.extract_roi_run(
                             sess_curr['csf_dir'], sess_curr['csf_filename'], 
                             run_4d, check_lengh=nvol, verbose=verbose)
+        labs_counf = labs_counf + csf_labs
+        arr_counf.append(csf_arr)
+        if verbose: print("applying csf \n")
+    else: 
+        wm_arr, wm_labs = None, None   
     #--- get MVT
-    mvt_arr, mvt_labs = ucr.extract_mvt(sess_curr['mvtfile'], run_idx0, nvol, 
+    if params['analysis']['apply_mvt']:
+        mvt_arr, mvt_labs = ucr.extract_mvt(sess_curr['mvtfile'], run_idx0, nvol, 
                                                                 verbose=verbose)
+        labs_counf = labs_counf + mvt_labs
+        arr_counf.append(mvt_arr)
+        if verbose: print("applying mvt \n")
+    else: 
+        mvt_arr, mvt_labs = None, None
     #--- get cosine functions;
-    bf_arr, bf_labs = ucr.extract_bf(low_freq, high_freq, nvol, dt, 
+    if params['analysis']['apply_filter']:
+        bf_arr, bf_labs = ucr.extract_bf(low_freq, high_freq, nvol, dt, 
                                                                 verbose=verbose)
+        labs_counf = labs_counf + bf_labs
+        arr_counf.append(bf_arr)
+        if verbose: print("applying filter \n")
+    else:
+        bf_arr, bf_labs = None, None
+    
     #--- put it together  
-    arr_counf = np.hstack((wm_arr, csf_arr, mvt_arr, bf_arr))
+    # arr_counf = np.hstack((wm_arr, csf_arr, mvt_arr, bf_arr))
+    arr_counf = np.hstack(tuple(arr_counf))
     labs_counf = wm_labs + csf_labs + mvt_labs + bf_labs
     
     if verbose:
