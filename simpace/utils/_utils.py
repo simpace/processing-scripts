@@ -652,7 +652,6 @@ def make_design_mtx(spm_mvt_file, hfcut=128, skip_TR=SKIPTR, normalize=True, to_
     
     return X, labels
 
-
 #----------------------------------------------
 # Projection functions
 
@@ -675,81 +674,107 @@ def R_proj(X, Y=None):
     else:
         return Y - proj(X, Y)
 
+
 #----------------------------------------------
 
-def process_one_roi(roi_idx, fmri_data, roi_mask, X, skip_TR=SKIPTR):
-    """
-    return the signal in the ROI indexed by roi_idx
-    after regressing out X
-    """
-    # mask_roi 
-    # roi_mask = np.logical_and((atlas_data == roi_idx), (fmri_mask==1))
-    
-    Nvox = roi_mask.sum()    
-    roi_data = fmri_data[roi_mask, :].T # .T : make it time x voxels
-    roi_data = roi_data[skip_TR:,:]
-    #print "roi_data.shape " , roi_data.shape
-    roi_data = R_proj(X, roi_data)
-    return roi_data.mean(axis=1), Nvox
-    
-    
-def mask_of_roi(roi_idx, fmri_mask, atlas_data):
-    """
-    return the mask voxels in roi     """
-    idx_vox = np.logical_and((atlas_data == roi_idx), fmri_mask)
-    return idx_vox
+# class Bag( dict ):
+#     """ a dict with d.key short for d["key"]
+#         d = Bag( k=v ... / **dict / dict.items() / [(k,v) ...] )  just like dict
+#     """
+#         # aka Dotdict
+# 
+#     def __init__(self, *args, **kwargs):
+#         dict.__init__( self, *args, **kwargs )
+#         self.__dict__ = self
+# 
+#     def __getnewargs__(self):  # for cPickle.dump( d, file, protocol=-1)
+#         return tuple(self)
 
-def extract_roi_signals(atlas, fmri, labels, roiMinSize=0):
-    """
+# # example: 
+#
+# d = Bag( np.load( "tmp.npz" ))
+# if d.TIME > 0:
+#     print "time %g  position %s" % (d.TIME, d.POSITION)
 
-    """
-    NbLabels = len(labels)
-    extracted = np.zeros((fmri.shape[-1], NbLabels))
-    extracted_labels = []
-    large_sizes = []
-    too_small = []
-    small_sizes = []
+################################################################################
+# code to rm - see if anything worth saving?
+################################################################################
 
-    out_idx = 0
-
-    for ii,lab in enumerate(labels):
-        assert lab[0].shape[0] == 1
-        idx = int(lab[0]) # one value 
-        roi = (atlas == idx)
-        NbVox = roi.sum()
-
-        if NbVox > roiMinSize:
-            extracted_labels.append(lab)
-            large_sizes.append(NbVox)
-            signal = fmri[roi,:].mean(axis=0)
-            extracted[:, out_idx] = signal
-            out_idx += 1
-        else:
-            too_small.append(lab)
-            small_sizes.append(NbVox)
-           
-    goods = zip(extracted_labels, large_sizes)
-    bads = zip(too_small, small_sizes)
-    return extracted[:,:out_idx], goods, bads
-
-
-def lab_names(labels):
-    return [lab[1][1] for lab in labels]
-
-def lab_idx(labels):
-    return [int(lab[0]) for lab in labels]
-
-def glab_enum(labels):
-    current = 0
-    while current < len(labels):
-        yield lab_idx([labels[current]])[0], lab_names([labels[current]])[0]
-        current += 1
-	
-def lab_enum(labels):
-    return [(lab_idx([labels[current]])[0], lab_names([labels[current]])[0]) 
-            for current in range(len(labels))]
-	
-
+# def process_one_roi(roi_idx, fmri_data, roi_mask, X, skip_TR=SKIPTR):
+#     """
+#     return the signal in the ROI indexed by roi_idx
+#     after regressing out X
+#     """
+#     # mask_roi 
+#     # roi_mask = np.logical_and((atlas_data == roi_idx), (fmri_mask==1))
+#     
+#     Nvox = roi_mask.sum()    
+#     roi_data = fmri_data[roi_mask, :].T # .T : make it time x voxels
+#     roi_data = roi_data[skip_TR:,:]
+#     #print "roi_data.shape " , roi_data.shape
+#     roi_data = R_proj(X, roi_data)
+#     return roi_data.mean(axis=1), Nvox
+#     
+#     
+# def mask_of_roi(roi_idx, fmri_mask, atlas_data):
+#     """
+#     return the mask voxels in roi     """
+#     idx_vox = np.logical_and((atlas_data == roi_idx), fmri_mask)
+#     return idx_vox
+# 
+# def extract_roi_signals(atlas, fmri, labels, roiMinSize=0):
+#     """
+# 
+#     """
+#     NbLabels = len(labels)
+#     extracted = np.zeros((fmri.shape[-1], NbLabels))
+#     extracted_labels = []
+#     large_sizes = []
+#     too_small = []
+#     small_sizes = []
+# 
+#     out_idx = 0
+# 
+#     for ii,lab in enumerate(labels):
+#         assert lab[0].shape[0] == 1
+#         idx = int(lab[0]) # one value 
+#         roi = (atlas == idx)
+#         NbVox = roi.sum()
+# 
+#         if NbVox > roiMinSize:
+#             extracted_labels.append(lab)
+#             large_sizes.append(NbVox)
+#             signal = fmri[roi,:].mean(axis=0)
+#             extracted[:, out_idx] = signal
+#             out_idx += 1
+#         else:
+#             too_small.append(lab)
+#             small_sizes.append(NbVox)
+#            
+#     goods = zip(extracted_labels, large_sizes)
+#     bads = zip(too_small, small_sizes)
+#     return extracted[:,:out_idx], goods, bads
+# 
+# 
+# def lab_names(labels):
+#     return [lab[1][1] for lab in labels]
+# 
+# def lab_idx(labels):
+#     return [int(lab[0]) for lab in labels]
+# 
+# def glab_enum(labels):
+#     current = 0
+#     while current < len(labels):
+#         yield lab_idx([labels[current]])[0], lab_names([labels[current]])[0]
+#         current += 1
+# 	
+# def lab_enum(labels):
+#     return [(lab_idx([labels[current]])[0], lab_names([labels[current]])[0]) 
+#             for current in range(len(labels))]
+# 	
+# 
+# 
+# 
 # correlations = []
 # 
 # idx_1 = 2
