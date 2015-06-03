@@ -68,7 +68,7 @@ def _get_smpace_processing_data():
     nb_runs = 4
 
     # get signals, info 
-    subjs_info = process_all(base_dir, params=params, verbose=False)
+    subjs_info = process_all(base_dir, params=params, verbose=True)
 
     jb_runs = []
     for run in range(nb_runs):
