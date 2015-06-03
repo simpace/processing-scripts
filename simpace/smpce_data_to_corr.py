@@ -296,20 +296,26 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     
     #--- put it together  
     # arr_counf = np.hstack((wm_arr, csf_arr, mvt_arr, bf_arr))
-    arr_counf = np.hstack(tuple(arr_counf))
-    labs_counf = wm_labs + csf_labs + mvt_labs + bf_labs
+    # labs_counf = wm_labs + csf_labs + mvt_labs + bf_labs
+    if arr_counf: 
+        some_counfounds = True
+        arr_counf = np.hstack(tuple(arr_counf))
     
     if verbose:
        print("wm.shape {}, csf.shape {}, mvt.shape {}, bf.shape {}".format(
                      wm_arr.shape, csf_arr.shape, mvt_arr.shape, bf_arr.shape))
+       print(labs_counf)
     #run_info['shapes'] = (wm_arr.shape, csf_arr.shape, mvt_arr.shape, bf_arr.shape)
     #run_info['mean_csf'] = csf_arr.mean(axis=0)
     #run_info['mean_mvt'] = mvt_arr.mean(axis=0)
 
     # filter and save 
     #-----------------------------------------------------
-    arr_sig, labels_sig = ucr._dict_signals_to_arr(signals)
-    arr_sig_f = ucr.R_proj(arr_counf, arr_sig)
+    arr_sig, labels_sig = ucr._dict_signals_to_arr(signals) 
+    if some_counfounds:
+        arr_sig_f = ucr.R_proj(arr_counf, arr_sig)
+    else:
+        arr_sig_f = arr_sig
 
     run_info = dict(arr_sig=arr_sig, labels_sig=labels_sig, issues=_issues, 
                     info=_info, arr_sig_f=arr_sig_f, arr_counf=arr_counf, 
