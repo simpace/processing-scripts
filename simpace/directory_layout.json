@@ -47,6 +47,11 @@
 			"dir": "sess_mask",
 			"roi_mask": "sess_mask.nii"
 		}
+	},
+	"res": {
+		"dir": "results",
+		"sig": "signals",
+		"corr": "corr_mtx"
 	}
 }
 

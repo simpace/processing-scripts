@@ -1,5 +1,6 @@
 {
 	"apply_sess_mask": true,
+	"apply_global_reg": false,
 	"apply_csf": true,
 	"apply_wm": true,
 	"apply_mvt": true,
@@ -13,6 +14,9 @@
 		"type": "6" 
 	},
 	"csf": {
+		"type": "mean" 
+	},
+	"gr": {
 		"type": "mean" 
 	},
 	"wm": {
