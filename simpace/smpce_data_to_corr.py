@@ -97,7 +97,7 @@ def do_one_subject(sub_curr, params, verbose=False):
     for sess_idx, sess_dir in enumerate(sess_dirs, 1): # start idx at 1
         sess_curr['sess_idx'] = sess_idx
         sess_curr['sess_dir'] = sess_dir
-        sess_str = (dlayo['dir']['sess+']).format(sub_idx)
+        sess_str = (dlayo['dir']['sess+']).format(sess_idx)
         if verbose: print('\n' + '---'*11  + "\n" + sess_str)
         sesss_info[sess_str] = do_one_sess(sess_curr, sub_curr, params, verbose=verbose) 
 
