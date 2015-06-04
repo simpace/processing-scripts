@@ -172,17 +172,18 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     # compute session wide mask
     #-----------------------------------------------------
     # compute_epi_mask(runs[0], opening=1, connected=True)
+    dir_mask = osp.join(runs_dir, dlayo['out']['sess_mask']['dir'])
+    sess_curr['mask_dir'] = dir_mask
+    sess_curr['mask_filename'] = dlayo['out']['sess_mask']['roi_mask']
+
+    sess_mask = None
+    # TODO : separate compute mask and apply
     if params['analysis']['apply_sess_mask']:
         sess_mask = msk.compute_multi_epi_mask(runs, lower_cutoff=0.2, 
                     upper_cutoff=0.85, connected=True, opening=2, threshold=0.5)
-        # store sess mask
-        dir_mask = osp.join(runs_dir, dlayo['out']['sess_mask']['dir'])
         suf.rm_and_create(dir_mask)
-        sess_curr['mask_dir'] = dir_mask
-        sess_curr['mask_filename'] = dlayo['out']['sess_mask']['roi_mask']
         sess_mask.to_filename(osp.join(sess_curr['mask_dir'], sess_curr['mask_filename']))
-    else:
-        sess_mask = None
+
     sess_curr['mask'] = sess_mask
 
     # TODO
@@ -284,7 +285,7 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
                             run_4d, check_lengh=nvol, verbose=verbose)
         labs_counf = labs_counf + gr_labs
         arr_counf.append(gr_arr)
-        if verbose: print("applying gr \n")
+        if verbose: print("applying GR \n")
     else: 
         gr_arr, gr_labs = None, None   
     #--- get MVT
@@ -314,9 +315,10 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
         arr_counf = np.hstack(tuple(arr_counf))
     
     if verbose:
-       print("wm.shape {}, csf.shape {}, mvt.shape {}, bf.shape {}".format(
-                     wm_arr.shape, csf_arr.shape, mvt_arr.shape, bf_arr.shape))
-       print(labs_counf)
+       #print("wm.shape {}, csf.shape {}, mvt.shape {}, bf.shape {}".format(
+       #              wm_arr.shape, csf_arr.shape, mvt_arr.shape, bf_arr.shape))
+       print(arr_counf.shape)
+       print(labs_counf[:17])
     #run_info['shapes'] = (wm_arr.shape, csf_arr.shape, mvt_arr.shape, bf_arr.shape)
     #run_info['mean_csf'] = csf_arr.mean(axis=0)
     #run_info['mean_mvt'] = mvt_arr.mean(axis=0)
