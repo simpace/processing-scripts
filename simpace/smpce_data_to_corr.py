@@ -178,7 +178,9 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
         # store sess mask
         dir_mask = osp.join(runs_dir, dlayo['out']['sess_mask']['dir'])
         suf.rm_and_create(dir_mask)
-        sess_mask.to_filename(osp.join(dir_mask, dlayo['out']['sess_mask']['roi_mask']))
+        sess_curr['mask_dir'] = dir_mask
+        sess_curr['mask_filename'] = dlayo['out']['sess_mask']['roi_mask']
+        sess_mask.to_filename(osp.join(sess_curr['mask_dir'], sess_curr['mask_filename']))
     else:
         sess_mask = None
     sess_curr['mask'] = sess_mask
@@ -274,7 +276,17 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
         arr_counf.append(csf_arr)
         if verbose: print("applying csf \n")
     else: 
-        wm_arr, wm_labs = None, None   
+        csf_arr, csf_labs = None, None   
+    #--- get GR 
+    if params['analysis']['apply_global_reg']:
+        gr_arr, gr_labs = ucr.extract_roi_run(
+                            sess_curr['mask_dir'], sess_curr['mask_filename'], 
+                            run_4d, check_lengh=nvol, verbose=verbose)
+        labs_counf = labs_counf + gr_labs
+        arr_counf.append(gr_arr)
+        if verbose: print("applying gr \n")
+    else: 
+        gr_arr, gr_labs = None, None   
     #--- get MVT
     if params['analysis']['apply_mvt']:
         mvt_arr, mvt_labs = ucr.extract_mvt(sess_curr['mvtfile'], run_idx0, nvol, 
