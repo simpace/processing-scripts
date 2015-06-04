@@ -250,10 +250,11 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
 
     # extract signals and save them in preproc/roi_signals
     #-----------------------------------------------------
+    min_vox_roi = params['analysis']['min_vox_in_roi']
     run_4d = concat_niimgs(file_names, ensure_ndim=4)
     signals, _issues, _info = ucr.extract_signals(sess_curr['droi'], 
                                                   sess_curr['roi_prefix'], run_4d, 
-                                                  mask=mask, minvox=1)   
+                                                  mask=mask, minvox=min_vox_roi)   
     # construct matrix of counfounds
     #-----------------------------------------------------
     arr_counf = []

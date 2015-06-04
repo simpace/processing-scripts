@@ -107,13 +107,15 @@ jb_runs_1 = _get_smpace_processing_data(set_params_1(params))
 #----------------------------------------------------#
 
 def test_process_all():
-    
+
+    min_vox = params['analysis']['min_vox_in_roi']
     # check the number of voxels for run 0 (same across runs):
     run0 = 0
     for k in jb_runs_1[run0]['labels_sig']:
         assert check_nvox[k] == jb_runs_1[run0]['info'][k]
     for k in jb_runs_1[run0]['issues']:
-        assert check_nvox[k] == 0, "nb vox at {} is {}".format(k, check_nvox[k])
+        assert check_nvox[k] < min_vox, "nb vox at {} is {}, min {}".format(
+                                                k, check_nvox[k], min_vox)
 
     # check the signals 
     for run in range(len(jb_runs_1)):
@@ -203,6 +205,13 @@ def test_global_regression():
         mi = jb_runs_2[run]['arr_counf'][:,idx].min()
         assert   ma - mi > np.finfo(jb_runs_2[run]['arr_counf'].dtype).eps * 10000
         print(ma, mi) 
+
+def test_nb_vox():
+    min_vox = params['analysis']['min_vox_in_roi']
+    run = 0
+    for k in jb_runs_2[run]['labels_sig']:
+        assert jb_runs_2[run]['info'][k] >= min_vox, "{},{}".format(
+                                        jb_runs_2[run]['info'][k], min_vox)
 
 
 

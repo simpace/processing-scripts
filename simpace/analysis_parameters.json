@@ -1,5 +1,6 @@
 {
 	"apply_sess_mask": true,
+	"min_vox_in_roi": 5,
 	"apply_global_reg": false,
 	"apply_csf": true,
 	"apply_wm": true,
