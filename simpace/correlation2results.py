@@ -59,16 +59,15 @@ def compute_corr_mtx(conds, common_labels):
     returns
     -------
     arr: list of 4 np.array, each (nsess, common_len, common_len)
+    stored_params: dict
+        parameters found in the extracted signals 
     """
-    idx0 = 0
     conditions_ = conds.keys()
     conditions  = ordered_conds()
     assert set(conditions_) == set(conditions)
     
-    cond0 = conditions[idx0]
-    sess0 = 0
+    cond0, sess0 = conditions[0], 0 # cond0 should be "none"
     nb_sess = len(conds[cond0])
-    #nb_cond = len(conds)
     shape_c = (nb_sess, len(common_labels), len(common_labels))
     
     conds_arr = {}
@@ -80,27 +79,24 @@ def compute_corr_mtx(conds, common_labels):
         for sess in range(nb_sess):
             dctsig = np.load(conds[cond][sess])
             idx_lab = np.asarray([lab in common_labels for lab in dctsig['labels_sig']])
-            # com_lab = [lab for lab in dctsig['labels_sig'] if lab in common_labels]
-            arr_c[sess] = np.corrcoef(dctsig['arr_sig_f'][:,idx_lab].T)
-            
             assert idx_lab.sum() == len(common_labels), "{},{}".format(
                                 idx_lab.shape[0] ,len(common_labels))
+            arr_c[sess] = np.corrcoef(dctsig['arr_sig_f'][:,idx_lab].T)
+            assert arr_c.max() <= 1.0, "max should be <= 1.0 {}".format(arr_c.max())  
             
-
         conds_arr[cond] = arr_c
     
     conds_arr['labels'] = common_labels
     stored_params = np.load(conds[cond0][sess0])['params']
-            # should be identical now across cond and sess check in the future if overloaded
+            # should be identical now across cond and sess, 
+            # check in the future if this will be overloaded
     
     return conds_arr, stored_params
 
 
 def save_results(basedir, analysis_label, params, verbose=False):
 
-    permission = 0o770
-    def ordered_conds():
-        return ['none', 'low', 'med', 'high']
+    permission = 0o770 # "rwxrws---"
     
     conds = _get_signals_filenames(basedir, params)
     common_labels = _get_common_labels(conds)
