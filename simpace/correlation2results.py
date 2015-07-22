@@ -13,8 +13,29 @@ from smpce_data_to_corr import get_params
 
 
 def _get_signals_filenames(basedir, params):
+    """
+    Parameters:
+    -----------
+    basedir: string
+        The base directory where the data lie
+    params: dict
+        params contains the information about the analysis
+        taken from a jason file.
+
+    returns:
+    --------
+    conds: dict
+        a dictionary with keys the different conditions (eg 'none', 'low', ...)
+        each key contains the npz filenames "signal_run??_`cond`.npz
+    """
+
     
-    layo = params['layout']
+    try:
+        layo = params['layout']
+    except:
+        print(basedir, '\n', params)
+        raise ValueError
+
     nb_sess = params['data']['nb_sess']
     #nb_sub = params['data']['nb_sub']
     #nb_run = params['data']['nb_run']
@@ -44,6 +65,24 @@ def ordered_conds():
     return ['none', 'low', 'med', 'high']
 
 def _get_common_labels(conds, idx0=0):
+    """
+    Returns the common labels across sessions 
+    For one session, the conditions should have the same regions, hence
+    it is enough to get the regions common across sessions for one condition.
+    idx0 provides with the index of that condition. 
+    
+
+    Parameters:
+    -----------
+    conds: dict
+        a dictionary with keys the different conditions (eg 'none', 'low', ...)
+        each key contains number of sessions npz filenames like :
+        "signal_run??_`cond`.npz"
+    idx0: int
+        index of the condition to determine the common rois across sessions 
+    returns:
+    --------
+    """
     
     cond0 = conds.keys()[idx0] 
     nb_sess = len(conds[cond0])
@@ -78,12 +117,24 @@ def compute_corr_mtx(conds, common_labels):
         
         for sess in range(nb_sess):
             dctsig = np.load(conds[cond][sess])
-            idx_lab = np.asarray([lab in common_labels for lab in dctsig['labels_sig']])
-            assert idx_lab.sum() == len(common_labels), "{},{}".format(
-                                idx_lab.shape[0] ,len(common_labels))
+            # create a boolean array indicating which of the labels in dctsig are in
+            # common_labels
+            idx_lab = np.asarray([lab in common_labels 
+                                      for lab in dctsig['labels_sig']])
+            assert idx_lab.sum() == len(common_labels), "\n {}, {}".format(
+                                           idx_lab.shape[0] ,len(common_labels))
+            # compute correlation matrix
             arr_c[sess] = np.corrcoef(dctsig['arr_sig_f'][:,idx_lab].T)
-            assert arr_c.max() <= 1.0, "max should be <= 1.0 {}".format(arr_c.max())  
-            
+            # check all values are ok
+            if arr_c[sess].max() > 1.0:
+                print('sess {} cond {} '.format(sess,cond))
+                print("max should be <= 1.0 {}".format(arr_c[sess].max()))
+                print(idx_lab.sum())
+                print(np.where(arr_c[sess] > 1.))
+                raise ValueError
+
+        # redundant with raise in the loop
+        # assert arr_c.max() <= 1.0, "max should be <= 1.0 and is: {}".format(arr_c.max())  
         conds_arr[cond] = arr_c
     
     conds_arr['labels'] = common_labels
@@ -95,6 +146,17 @@ def compute_corr_mtx(conds, common_labels):
 
 
 def save_results(basedir, analysis_label, params, verbose=False):
+    """
+    take basedir and analysis label to store the correlation matrix
+    and the parameters in a directory determine by 
+    basedir + params['layout']['res']['dir'] + analysis_label+'_'+timestr
+    
+    Parameters:
+    -----------
+    basedir: string
+    analysis_label: string
+    params: dict
+    """
 
     permission = 0o770 # "rwxrws---"
     
@@ -102,29 +164,28 @@ def save_results(basedir, analysis_label, params, verbose=False):
     common_labels = _get_common_labels(conds)
     conds_arr, stored_params = compute_corr_mtx(conds, common_labels)
 
-    params = get_params(basedir)
+    params    = get_params(basedir)
     resultdir = params['layout']['res']['dir']
     matrixdir = params['layout']['res']['corr']
-    mvsigdir = params['layout']['res']['sig']
-    timestr = time.strftime("%m%d_%H%M%S")
+    cpsigdir  = params['layout']['res']['sig']
+    timestr   = time.strftime("%m%d_%H%M%S")
     
-    res_dir = osp.join(basedir, resultdir)
-    if not osp.isdir(res_dir):
-        os.makedirs(res_dir, permission)
-    
-    # make directories - will look like results/"analysis_label"_timestr/...
+    res_dir   = osp.join(basedir, resultdir)
     label_dir = osp.join(res_dir, analysis_label+'_'+timestr)
     matrixdir = osp.join(label_dir, matrixdir)
-    mvsigdir = osp.join(label_dir, mvsigdir)
+    cpsigdir  = osp.join(label_dir, cpsigdir)
 
+    # make directories - will look like results/"analysis_label"_timestr/...
+    if not osp.isdir(res_dir):
+        os.makedirs(res_dir, permission)
     os.makedirs(label_dir, permission)
     os.makedirs(matrixdir, permission)
-    os.makedirs(mvsigdir, permission)
+    os.makedirs(cpsigdir, permission)
 
-    # cp files to mvsigdir
+    # cp files containing signals to cpsigdir
     for cond in conds:
         for fn in conds[cond]:
-            shu.copy(fn, mvsigdir)
+            shu.copy(fn, cpsigdir)
     
     # save correlation matrices
     fn_save = osp.join(matrixdir, analysis_label)
@@ -132,6 +193,18 @@ def save_results(basedir, analysis_label, params, verbose=False):
             conds_arr=conds_arr, stored_params=stored_params)
 
     return fn_save
+
+def _test_common_labels(conds):
+    """
+    check that all conditions have the same common rois (ie labels)
+    4 conditions
+    """
+    common_labels = _get_common_labels(conds, idx0=0)
+    assert common_labels == _get_common_labels(conds, idx0=1)
+    assert common_labels == _get_common_labels(conds, idx0=2)
+    assert common_labels == _get_common_labels(conds, idx0=3)
+    return True 
+
 
 #-------------------------------------------------------------------------------
 # main
@@ -166,14 +239,12 @@ if __name__ == "__main__":
         print("nb_sub: {} nb_sess: {}, nb_run: {}".format(nb_sub, nb_sess, nb_run))
 
     conds = _get_signals_filenames(base_dir, params)
+    if verbose: print("conditions in conds: {}".format(conds.keys()))
 
-    if verbose: print(conds.keys())
-    common_labels = _get_common_labels(conds)
-    assert common_labels == _get_common_labels(conds, idx0=3)
-    assert common_labels == _get_common_labels(conds, idx0=2)
+    # some checks
+    assert _test_common_labels(conds)
 
     fn_saved = save_results(base_dir, analysis_label, params, verbose=verbose)
 
     if verbose: print(fn_saved)
-
 
