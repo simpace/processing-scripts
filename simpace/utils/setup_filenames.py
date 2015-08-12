@@ -67,7 +67,7 @@ def check_dir(filepath, checklist=['exists']):
     bool 
         a boolean if all checklist conditions are true
     """
-    if isinstance(checklist, six.string_types):
+    if isinstance(checklist, string_types):
         checklist = [checklist]
 
     checkbool = True
@@ -316,7 +316,7 @@ def _check_glob_res(res, ensure=None, files_only=True):
 #-----------------------------------------------------------------------------
 # Main Script
 #-----------------------------------------------------------------------------
-DESPO_SIMPACE_DIR = '/home/despo/simpace/subject_1_data/'
+DESPO_SIMPACE_DIR = '/home/despo/simpace/'
 SUB_NUM = 1
 NB_DISCARD_VOL = 4 #number of initial volumes to discard
 
@@ -324,26 +324,35 @@ NB_DISCARD_VOL = 4 #number of initial volumes to discard
 def main(argv = sys.argv):
     """
     argv[1]: a string to specify a session, eg: sept_17, or *
-    argv[2]: the top subject directory. 
+    argv[2]: the top directory. 
              optional, if not given defaults to DESPO_SIMPACE_DIR
+    argv[3]: the subject number.
+             optional, if not given, defaults to SUB_NUM
     """
     if not MATLAB_INSTALLED:
         print("MATLAB_INSTALLED is {}:doing nothing".format(MATLAB_INSTALLED))
-        return None
+        #return None
     
     # first argument is the top subject directory
     if len(argv) >= 2:
         sess_specified = argv[1]
     else:
         sess_specified = ''
-    if sess_specified == '*':
+    if sess_specified == '*' or 'all':
         sess_specified = ''
 
     if len(argv) >= 3:
-        # second argument is the top subject directory
-        sub_dir = argv[2]
+        # second argument is the top data directory
+        data_dir = argv[2]
     else:
-        sub_dir = DESPO_SIMPACE_DIR 
+        data_dir = DESPO_SIMPACE_DIR 
+
+    if len(argv) >= 4:
+        # thrid argument is the subject directory
+        sub_dir = pjoin(data_dir,'subject_%s_data' %(argv[3]))
+    else:
+        sub_dir = pjoin(data_dir,'subject_%s_data' %(SUB_NUM))
+    
     assert check_dir(sub_dir, ['exists'])
 
 
@@ -359,7 +368,7 @@ def main(argv = sys.argv):
     dicom_convert = spmu.DicomImport()
 
     for sessidx, sess in enumerate(sess_dirs):
-
+        1/0
         print "working on session " + sess
         #setup the output directory for the new file names,
         out_dir = pjoin(sub_dir,'rename_files','sess%02d' %(sessidx+1))
