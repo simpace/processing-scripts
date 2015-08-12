@@ -16,9 +16,9 @@ from six import string_types
 
 # export MATLAB_INSTALLED=1 
 MATLAB_INSTALLED = os.environ.get('MATLAB_INSTALLED')
-if MATLAB_INSTALLED is not None:
-    import nipype.interfaces.spm.utils as spmu
-    import nipype.interfaces.matlab as matlab
+#if MATLAB_INSTALLED is not None:
+import nipype.interfaces.spm.utils as spmu
+import nipype.interfaces.matlab as matlab
 #
 
 
@@ -357,20 +357,22 @@ def main(argv = sys.argv):
 
     numvols = NB_DISCARD_VOL 
     sub = SUB_NUM
-    
-    #get list of dicoms
-    sess_dirs = glob(pjoin(sub_dir,'ImageData*'+sess_specified+'*'))
-    sess_dirs = sort_acqdate(sess_dirs)
-    
+
     #set up dicom conversion for later
     matlab.MatlabCommand.set_default_paths('/usr/local/matlab-tools/spm/spm8')
     dicom_convert = spmu.DicomImport()
 
-    for sessidx, sess in enumerate(sess_dirs):
-        1/0
+
+    #CONVERT AND RENAME EPIs
+    #get list of epi dicoms
+    sess_dirs = glob(pjoin(sub_dir,'ImageData*'+sess_specified+'*'))
+    sess_dirs = sort_acqdate(sess_dirs)
+
+    for sessidx, sess in enumerate(sess_dirs,start=1):
+        
         print "working on session " + sess
         #setup the output directory for the new file names,
-        out_dir = pjoin(sub_dir,'rename_files','sess%02d' %(sessidx+1))
+        out_dir = pjoin(data_dir,'rename_files','sub%02d'%(sub),'sess%02d'%(sessidx))
         
         #rm the directory and contents if it already exists
         # !!!!!!! DEBUG MODE : remove dir if exists 
@@ -408,12 +410,12 @@ def main(argv = sys.argv):
         #put all 4 runs into a list for sorting
         runs = [fnone, flow, fmed, fhigh]
         runs_sort = sort_acqtime(runs)
-
+        1/0
         #copy dicoms to have new directory
-        for runidx, runname in enumerate(np.array(runs_sort)):
+        for runidx, runname in enumerate(np.array(runs_sort,start=1)):
 
             #create the new dir name, and make it
-            new_fname = 'sub%02d_sess%02d_run%02d' %(int(sub),sessidx+1,runidx+1)
+            new_fname = 'sub%02d_sess%02d_run%02d' %(int(sub),sessidx,runidx)
             new_runname = pjoin(out_dir,new_fname)
             new_dcmdir = pjoin(new_runname,'dicoms')
             print " \t working on run : " + runname # debug
@@ -464,7 +466,7 @@ def main(argv = sys.argv):
             
             #do dicom conversion
             #first create a nifti directory
-            nii_dir = pjoin(new_runname,'data')
+            nii_dir = pjoin(new_runname,'niftis')
             if not check_dir(nii_dir):
                 os.makedirs(nii_dir, 0o770)
             else:
@@ -487,7 +489,7 @@ def main(argv = sys.argv):
         mot_order = get_motorder(runs_sort)
         
         #save params file
-        json_fname = pjoin(out_dir,'sub%02d_sess%02d_params.json' %(int(sub),sessidx+1))
+        json_fname = pjoin(out_dir,'sub%02d_sess%02d_params.json' %(int(sub),sessidx))
         params = dict(date = scan_date,
                       motion = mot_order)
         with open(json_fname, 'wb') as outfile:
@@ -498,6 +500,54 @@ def main(argv = sys.argv):
         except:
             print "Could not chmod " + json_fname + " to 0o770 "
             raise
+
+
+    #CONVERT AND RENAME ANAT
+    #get list of epi dicoms
+    anat_dir = glob(pjoin(sub_dir,'anatomical*','T1*'))
+    #setup the output directory for anat
+    out_adir = pjoin(data_dir,'rename_files','sub%02d'%(int(sub)),'anatomical')
+
+    #rm the directory and contents if it already exists
+    # !!!!!!! DEBUG MODE : remove dir if exists 
+    if check_dir(out_adir, ['exists']): # equivalent to osp.isdir(out_adir)
+        try:
+            shutil.rmtree(out_adir)
+        except:
+            # attempt to change permissions ?
+            # os.chmod(out_adir, 0o770)
+            print "cannot remove : " + out_adir
+            print "please run 'chmod -R 770 on : " + out_adir
+
+    #only run if this directory does not exist yet
+    if not check_dir(out_adir, ['exists']):
+        try:
+            os.makedirs(out_adir, 0o770) 
+        except:
+            print "cannot make " + out_adir
+            raise
+    else:
+        print " directory : " + out_adir + " already exists"
+    
+    #create the new adir name for niftis
+    nii_adir = pjoin(out_adir,'niftis')
+
+    if not check_dir(nii_adir):
+        os.makedirs(nii_adir, 0o770)
+    else:
+        print "anatomical nifti directory " + nii_adir + " already exists"
+        raise
+
+    anatdcm_files = sorted(glob(pjoin(anat_dir[0],'*.dcm')))
+    dicom_convert.inputs.in_files = anatdcm_files
+    dicom_convert.inputs.output_dir = nii_adir
+    dicom_convert.run()
+
+    #rename anat nifti
+    old_anat_nii = glob(pjoin(nii_adir,'*.nii'))[0]
+    new_anat_nii = pjoin(nii_adir,'sub%02d_anatomical.nii' %(int(sub)))
+    shutil.move(old_anat_nii,new_anat_nii)
+    
 
 if __name__ == '__main__':
     main()
