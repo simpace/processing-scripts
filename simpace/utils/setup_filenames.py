@@ -323,7 +323,7 @@ NB_DISCARD_VOL = 4 #number of initial volumes to discard
 
 def main(argv = sys.argv):
     """
-    argv[1]: a string to specify a session, eg: sept_17, or *
+    argv[1]: a string to specify a session, eg: sept_17, or all
     argv[2]: the top directory. 
              optional, if not given defaults to DESPO_SIMPACE_DIR
     argv[3]: the subject number.
@@ -338,7 +338,7 @@ def main(argv = sys.argv):
         sess_specified = argv[1]
     else:
         sess_specified = ''
-    if sess_specified == '*' or 'all':
+    if sess_specified == 'all':
         sess_specified = ''
 
     if len(argv) >= 3:
@@ -354,7 +354,6 @@ def main(argv = sys.argv):
         sub_dir = pjoin(data_dir,'subject_%s_data' %(SUB_NUM))
     
     assert check_dir(sub_dir, ['exists'])
-
 
     numvols = NB_DISCARD_VOL 
     sub = SUB_NUM
