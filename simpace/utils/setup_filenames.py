@@ -243,30 +243,29 @@ def rename_niftis(prefix,nii_dir,numvols):
 
     #get the nifti files in the directory
     niftis = sorted(glob(pjoin(nii_dir,'*.nii')))
-
     vols = range(numvols+1,(len(niftis)+numvols+1)) #get the number of volumes total to create new files
 
     #loop through them and rename the prefix
     for fidx, fname in enumerate(niftis):
         
         new_fname = """%s-%04d.nii""" %(prefix,vols[fidx])
-        # print new_fname
         
         #change the filenames
         shutil.move(fname,pjoin(nii_dir,new_fname))
 
 
-def move_first_vols(new_dcmdir,init_dcmdir,numvols=4):
-    """This function moves a given number of volumes from new_dcmdir to init_dcmdir"""
+def move_first_vols(new_dir,init_dir,numvols=4):
+    """This function moves a given number of volumes from new_dir to init_dir"""
 
     for vol in range(1,numvols+1):
-        dcms = glob(pjoin(new_dcmdir,'IM-*-%04d.dcm' %(vol)))
-        dcm = dcms[0]
+        niis = glob(pjoin(new_dir,'*-*-%05d-%06d-*.nii' %(vol,vol)))
+        nii = niis[0]
+        
         #TEST that dcm only has one value
-        if not len(dcms) == 1:
-            raise ValueError("more than on dicom match for moving")
+        if not len(niis) == 1:
+            raise ValueError("more than on nifti match for moving")
 
-        mv_command = """mv %s %s""" %(dcm,init_dcmdir)
+        mv_command = """mv %s %s""" %(nii,init_dir)
         os.system(mv_command)
 
 
@@ -410,25 +409,46 @@ def main(argv = sys.argv):
         #put all 4 runs into a list for sorting
         runs = [fnone, flow, fmed, fhigh]
         runs_sort = sort_acqtime(runs)
-        1/0
+        
         #copy dicoms to have new directory
-        for runidx, runname in enumerate(np.array(runs_sort,start=1)):
+        for runidx, runname in enumerate(np.array(runs_sort),start=1):
 
             #create the new dir name, and make it
             new_fname = 'sub%02d_sess%02d_run%02d' %(int(sub),sessidx,runidx)
             new_runname = pjoin(out_dir,new_fname)
-            new_dcmdir = pjoin(new_runname,'dicoms')
             print " \t working on run : " + runname # debug
             print " \t run name : " + new_runname   # debug
-            print " \t new_dcmdir : " + new_dcmdir  # debug
 
-            #-------- Directory not created yet - cannot check 
-            #- if not (isuser_writeable(new_runname) and isuser_executeable(new_runname)):
-            #-     # attempt to change permissions
-            #-     os.chmod(new_runname, 0o770)
-            #- if not (isuser_writeable(new_dcmdir) and isuser_executeable(new_dcmdir)):
-            #-     # attempt to change permissions
-            #-     os.chmod(new_dcmdir, 0o770)
+            #get the list of dcm files for that run
+            epidcm_files = sorted(glob(pjoin(runname,'*.dcm')))
+            
+            #create a nifti directory and do dicom conversion
+            nii_dir = pjoin(new_runname,'niftis')
+            if not check_dir(nii_dir):
+                os.makedirs(nii_dir, 0o770)
+            else:
+                print "nifti directory " + nii_dir + " already exists"
+                raise
+
+            dicom_convert.inputs.in_files = epidcm_files
+            dicom_convert.inputs.output_dir = nii_dir
+            dicom_convert.run()
+
+            #move the first niftis to a new dir
+            init_nii_dir = pjoin(nii_dir,'first_vols')
+            if not os.path.exists(init_nii_dir):
+                try:
+                    os.makedirs(init_nii_dir, 0o770)
+                except:
+                    st = os.stat(nii_dir)
+                    print "cannot create 'first_vols' in " + nii_dir + \
+                                                ' mode is :', str(st.st_mode)
+                    raise
+            move_first_vols(nii_dir, init_nii_dir, numvols=numvols)
+
+            #rename the niftis 
+            rename_niftis(new_fname,nii_dir,numvols)
+            1/0
 
             #copy dir with the new name
             try:
@@ -460,26 +480,8 @@ def main(argv = sys.argv):
                     print "cannot create 'first_vols' in " + new_dcmdir + \
                                                 ' mode is :', str(st.st_mode)
                     raise
-
-            #move the first four dcms to a new dir
-            move_first_vols(new_dcmdir, init_dcmdir, numvols=numvols)
             
-            #do dicom conversion
-            #first create a nifti directory
-            nii_dir = pjoin(new_runname,'niftis')
-            if not check_dir(nii_dir):
-                os.makedirs(nii_dir, 0o770)
-            else:
-                print "nifti directory " + nii_dir + " already exists"
-                raise
-
-            dcm_files = sorted(glob(pjoin(new_dcmdir,'*.dcm')))
-            dicom_convert.inputs.in_files = dcm_files
-            dicom_convert.inputs.output_dir = nii_dir
-            dicom_convert.run()
             
-            #rename the niftis in this directory 
-            rename_niftis(new_fname,nii_dir,numvols)
             
         #get info for the params file
         #date of data collection (nb: this assumes all runs were collected in the same day)
