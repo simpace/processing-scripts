@@ -448,41 +448,7 @@ def main(argv = sys.argv):
 
             #rename the niftis 
             rename_niftis(new_fname,nii_dir,numvols)
-            1/0
 
-            #copy dir with the new name
-            try:
-                # which permissions are given in the copy ?
-                shutil.copytree(runname, new_dcmdir)
-            except:
-                print "cannot copytree " + runname + " in " + new_dcmdir
-                raise
-
-            # The copy may have worked, but wrong permission passed. 
-            # Try to 770 these.
-            try:
-                # walk from one level up the new_dcmdir
-                for root, dirs, files in os.walk(new_runname):
-                    for d in dirs:
-                        os.chmod(pjoin(root,d),  0o770)
-                    for f in files:
-                        os.chmod(pjoin(root,f),  0o770)
-            except:
-                print "could not change permissions of " + new_dcmdir
-                raise
-
-            init_dcmdir = pjoin(new_dcmdir,'first_vols')
-            if not os.path.exists(init_dcmdir):
-                try:
-                    os.makedirs(init_dcmdir, 0o770)
-                except:
-                    st = os.stat(new_dcmdir)
-                    print "cannot create 'first_vols' in " + new_dcmdir + \
-                                                ' mode is :', str(st.st_mode)
-                    raise
-            
-            
-            
         #get info for the params file
         #date of data collection (nb: this assumes all runs were collected in the same day)
         scan_date = get_date(runs_sort)
