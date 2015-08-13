@@ -16,9 +16,9 @@ from six import string_types
 
 # export MATLAB_INSTALLED=1 
 MATLAB_INSTALLED = os.environ.get('MATLAB_INSTALLED')
-if MATLAB_INSTALLED is not None:
-    import nipype.interfaces.spm.utils as spmu
-    import nipype.interfaces.matlab as matlab
+#if MATLAB_INSTALLED is not None:
+import nipype.interfaces.spm.utils as spmu
+import nipype.interfaces.matlab as matlab
 #
 
 
@@ -67,7 +67,7 @@ def check_dir(filepath, checklist=['exists']):
     bool 
         a boolean if all checklist conditions are true
     """
-    if isinstance(checklist, six.string_types):
+    if isinstance(checklist, string_types):
         checklist = [checklist]
 
     checkbool = True
@@ -243,30 +243,29 @@ def rename_niftis(prefix,nii_dir,numvols):
 
     #get the nifti files in the directory
     niftis = sorted(glob(pjoin(nii_dir,'*.nii')))
-
     vols = range(numvols+1,(len(niftis)+numvols+1)) #get the number of volumes total to create new files
 
     #loop through them and rename the prefix
     for fidx, fname in enumerate(niftis):
         
         new_fname = """%s-%04d.nii""" %(prefix,vols[fidx])
-        # print new_fname
         
         #change the filenames
         shutil.move(fname,pjoin(nii_dir,new_fname))
 
 
-def move_first_vols(new_dcmdir,init_dcmdir,numvols=4):
-    """This function moves a given number of volumes from new_dcmdir to init_dcmdir"""
+def move_first_vols(new_dir,init_dir,numvols=4):
+    """This function moves a given number of volumes from new_dir to init_dir"""
 
     for vol in range(1,numvols+1):
-        dcms = glob(pjoin(new_dcmdir,'IM-*-%04d.dcm' %(vol)))
-        dcm = dcms[0]
+        niis = glob(pjoin(new_dir,'*-*-%05d-%06d-*.nii' %(vol,vol)))
+        nii = niis[0]
+        
         #TEST that dcm only has one value
-        if not len(dcms) == 1:
-            raise ValueError("more than on dicom match for moving")
+        if not len(niis) == 1:
+            raise ValueError("more than on nifti match for moving")
 
-        mv_command = """mv %s %s""" %(dcm,init_dcmdir)
+        mv_command = """mv %s %s""" %(nii,init_dir)
         os.system(mv_command)
 
 
@@ -316,53 +315,63 @@ def _check_glob_res(res, ensure=None, files_only=True):
 #-----------------------------------------------------------------------------
 # Main Script
 #-----------------------------------------------------------------------------
-DESPO_SIMPACE_DIR = '/home/despo/simpace/subject_1_data/'
+DESPO_SIMPACE_DIR = '/home/despo/simpace/'
 SUB_NUM = 1
 NB_DISCARD_VOL = 4 #number of initial volumes to discard
 
 
 def main(argv = sys.argv):
     """
-    argv[1]: a string to specify a session, eg: sept_17, or *
-    argv[2]: the top subject directory. 
+    argv[1]: a string to specify a session, eg: sept_17, or all
+    argv[2]: the top directory. 
              optional, if not given defaults to DESPO_SIMPACE_DIR
+    argv[3]: the subject number.
+             optional, if not given, defaults to SUB_NUM
     """
     if not MATLAB_INSTALLED:
         print("MATLAB_INSTALLED is {}:doing nothing".format(MATLAB_INSTALLED))
-        return None
+        #return None
     
     # first argument is the top subject directory
     if len(argv) >= 2:
         sess_specified = argv[1]
     else:
         sess_specified = ''
-    if sess_specified == '*':
+    if sess_specified == 'all':
         sess_specified = ''
 
     if len(argv) >= 3:
-        # second argument is the top subject directory
-        sub_dir = argv[2]
+        # second argument is the top data directory
+        data_dir = argv[2]
     else:
-        sub_dir = DESPO_SIMPACE_DIR 
-    assert check_dir(sub_dir, ['exists'])
+        data_dir = DESPO_SIMPACE_DIR 
 
+    if len(argv) >= 4:
+        # thrid argument is the subject directory
+        sub_dir = pjoin(data_dir,'subject_%s_data' %(argv[3]))
+    else:
+        sub_dir = pjoin(data_dir,'subject_%s_data' %(SUB_NUM))
+    
+    assert check_dir(sub_dir, ['exists'])
 
     numvols = NB_DISCARD_VOL 
     sub = SUB_NUM
-    
-    #get list of dicoms
-    sess_dirs = glob(pjoin(sub_dir,'ImageData*'+sess_specified+'*'))
-    sess_dirs = sort_acqdate(sess_dirs)
-    
+
     #set up dicom conversion for later
     matlab.MatlabCommand.set_default_paths('/usr/local/matlab-tools/spm/spm8')
     dicom_convert = spmu.DicomImport()
 
-    for sessidx, sess in enumerate(sess_dirs):
 
+    #CONVERT AND RENAME EPIs
+    #get list of epi dicoms
+    sess_dirs = glob(pjoin(sub_dir,'ImageData*'+sess_specified+'*'))
+    sess_dirs = sort_acqdate(sess_dirs)
+
+    for sessidx, sess in enumerate(sess_dirs,start=1):
+        
         print "working on session " + sess
         #setup the output directory for the new file names,
-        out_dir = pjoin(sub_dir,'rename_files','sess%02d' %(sessidx+1))
+        out_dir = pjoin(data_dir,'rename_files','sub%02d'%(sub),'sess%02d'%(sessidx))
         
         #rm the directory and contents if it already exists
         # !!!!!!! DEBUG MODE : remove dir if exists 
@@ -400,77 +409,46 @@ def main(argv = sys.argv):
         #put all 4 runs into a list for sorting
         runs = [fnone, flow, fmed, fhigh]
         runs_sort = sort_acqtime(runs)
-
+        
         #copy dicoms to have new directory
-        for runidx, runname in enumerate(np.array(runs_sort)):
+        for runidx, runname in enumerate(np.array(runs_sort),start=1):
 
             #create the new dir name, and make it
-            new_fname = 'sub%02d_sess%02d_run%02d' %(int(sub),sessidx+1,runidx+1)
+            new_fname = 'sub%02d_sess%02d_run%02d' %(int(sub),sessidx,runidx)
             new_runname = pjoin(out_dir,new_fname)
-            new_dcmdir = pjoin(new_runname,'dicoms')
             print " \t working on run : " + runname # debug
             print " \t run name : " + new_runname   # debug
-            print " \t new_dcmdir : " + new_dcmdir  # debug
 
-            #-------- Directory not created yet - cannot check 
-            #- if not (isuser_writeable(new_runname) and isuser_executeable(new_runname)):
-            #-     # attempt to change permissions
-            #-     os.chmod(new_runname, 0o770)
-            #- if not (isuser_writeable(new_dcmdir) and isuser_executeable(new_dcmdir)):
-            #-     # attempt to change permissions
-            #-     os.chmod(new_dcmdir, 0o770)
-
-            #copy dir with the new name
-            try:
-                # which permissions are given in the copy ?
-                shutil.copytree(runname, new_dcmdir)
-            except:
-                print "cannot copytree " + runname + " in " + new_dcmdir
-                raise
-
-            # The copy may have worked, but wrong permission passed. 
-            # Try to 770 these.
-            try:
-                # walk from one level up the new_dcmdir
-                for root, dirs, files in os.walk(new_runname):
-                    for d in dirs:
-                        os.chmod(pjoin(root,d),  0o770)
-                    for f in files:
-                        os.chmod(pjoin(root,f),  0o770)
-            except:
-                print "could not change permissions of " + new_dcmdir
-                raise
-
-            init_dcmdir = pjoin(new_dcmdir,'first_vols')
-            if not os.path.exists(init_dcmdir):
-                try:
-                    os.makedirs(init_dcmdir, 0o770)
-                except:
-                    st = os.stat(new_dcmdir)
-                    print "cannot create 'first_vols' in " + new_dcmdir + \
-                                                ' mode is :', str(st.st_mode)
-                    raise
-
-            #move the first four dcms to a new dir
-            move_first_vols(new_dcmdir, init_dcmdir, numvols=numvols)
+            #get the list of dcm files for that run
+            epidcm_files = sorted(glob(pjoin(runname,'*.dcm')))
             
-            #do dicom conversion
-            #first create a nifti directory
-            nii_dir = pjoin(new_runname,'data')
+            #create a nifti directory and do dicom conversion
+            nii_dir = pjoin(new_runname,'niftis')
             if not check_dir(nii_dir):
                 os.makedirs(nii_dir, 0o770)
             else:
                 print "nifti directory " + nii_dir + " already exists"
                 raise
 
-            dcm_files = sorted(glob(pjoin(new_dcmdir,'*.dcm')))
-            dicom_convert.inputs.in_files = dcm_files
+            dicom_convert.inputs.in_files = epidcm_files
             dicom_convert.inputs.output_dir = nii_dir
             dicom_convert.run()
-            
-            #rename the niftis in this directory 
+
+            #move the first niftis to a new dir
+            init_nii_dir = pjoin(nii_dir,'first_vols')
+            if not os.path.exists(init_nii_dir):
+                try:
+                    os.makedirs(init_nii_dir, 0o770)
+                except:
+                    st = os.stat(nii_dir)
+                    print "cannot create 'first_vols' in " + nii_dir + \
+                                                ' mode is :', str(st.st_mode)
+                    raise
+            move_first_vols(nii_dir, init_nii_dir, numvols=numvols)
+
+            #rename the niftis 
             rename_niftis(new_fname,nii_dir,numvols)
-            
+
         #get info for the params file
         #date of data collection (nb: this assumes all runs were collected in the same day)
         scan_date = get_date(runs_sort)
@@ -479,7 +457,7 @@ def main(argv = sys.argv):
         mot_order = get_motorder(runs_sort)
         
         #save params file
-        json_fname = pjoin(out_dir,'sub%02d_sess%02d_params.json' %(int(sub),sessidx+1))
+        json_fname = pjoin(out_dir,'sub%02d_sess%02d_params.json' %(int(sub),sessidx))
         params = dict(date = scan_date,
                       motion = mot_order)
         with open(json_fname, 'wb') as outfile:
@@ -490,6 +468,54 @@ def main(argv = sys.argv):
         except:
             print "Could not chmod " + json_fname + " to 0o770 "
             raise
+
+
+    #CONVERT AND RENAME ANAT
+    #get list of epi dicoms
+    anat_dir = glob(pjoin(sub_dir,'anatomical*','T1*'))
+    #setup the output directory for anat
+    out_adir = pjoin(data_dir,'rename_files','sub%02d'%(int(sub)),'anatomical')
+
+    #rm the directory and contents if it already exists
+    # !!!!!!! DEBUG MODE : remove dir if exists 
+    if check_dir(out_adir, ['exists']): # equivalent to osp.isdir(out_adir)
+        try:
+            shutil.rmtree(out_adir)
+        except:
+            # attempt to change permissions ?
+            # os.chmod(out_adir, 0o770)
+            print "cannot remove : " + out_adir
+            print "please run 'chmod -R 770 on : " + out_adir
+
+    #only run if this directory does not exist yet
+    if not check_dir(out_adir, ['exists']):
+        try:
+            os.makedirs(out_adir, 0o770) 
+        except:
+            print "cannot make " + out_adir
+            raise
+    else:
+        print " directory : " + out_adir + " already exists"
+    
+    #create the new adir name for niftis
+    nii_adir = pjoin(out_adir,'niftis')
+
+    if not check_dir(nii_adir):
+        os.makedirs(nii_adir, 0o770)
+    else:
+        print "anatomical nifti directory " + nii_adir + " already exists"
+        raise
+
+    anatdcm_files = sorted(glob(pjoin(anat_dir[0],'*.dcm')))
+    dicom_convert.inputs.in_files = anatdcm_files
+    dicom_convert.inputs.output_dir = nii_adir
+    dicom_convert.run()
+
+    #rename anat nifti
+    old_anat_nii = glob(pjoin(nii_adir,'*.nii'))[0]
+    new_anat_nii = pjoin(nii_adir,'sub%02d_anatomical.nii' %(int(sub)))
+    shutil.move(old_anat_nii,new_anat_nii)
+    
 
 if __name__ == '__main__':
     main()
