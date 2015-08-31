@@ -1,0 +1,89 @@
+{
+  "base": "./",
+  "disk_hierarchy": ["subjects", "sessions", "runs"],
+  "subjects": {
+    "base": "",
+    "hasdirs": true,
+    "key": "sub",
+    "val": "{sub:02d}",
+    "pre": "",
+    "glb": "sub*",
+    "lnk": "_"
+  },
+  "sessions": {
+    "pth": ["subjects"],
+    "base": "",
+    "hasdirs": true,
+    "key": "sess",
+    "val": "{sess:02d}",
+    "pre": "",
+    "glb": "sess*",
+    "lnk": "_"
+  },
+  "runs": {
+    "base": "preproc",
+    "pth": ["subjects", "sessions"],
+    "hasdirs": false,
+    "key": "run",
+    "val": "{run:02d}",
+    "pre": "",
+    "lnk": "-"
+  },
+  "smoothed": {
+    "base": "smooth",
+    "pth": ["subjects", "sessions", "runs"],
+    "hasdirs": false,
+    "pre": "sra",
+    "post": "????.nii*",
+    "glb": ["pre", "subjects", "sessions", "runs", "post"]
+  },
+  "gm_mask": {
+    "base": "gm_in_func_res",
+    "pth": ["subjects", "sessions", "runs"],
+    "hasdirs": false,
+    "glb": "gm_func_res.nii",
+    "link": "../coreg/rgm_anatres.nii"
+  },
+  "wm_mask": {
+    "base": "wm_in_func_res",
+    "pth": ["subjects", "sessions", "runs"],
+    "hasdirs": false,
+    "glb": "wm_func_res.nii",
+    "link": "../coreg/rwm_anatres.nii"
+  },
+  "csf_mask": {
+    "base": "csf_in_func_res",
+    "pth": ["subjects", "sessions", "runs"],
+    "hasdirs": false,
+    "glb": "csf_func_res.nii",
+    "link": "../coreg/rcsf_anatres.nii"
+  },
+  "aal_roi": {
+    "base": "coreg",
+    "pth": ["subjects", "sessions", "runs"],
+    "hasdirs": false,
+    "glb": "rraal_*.nii"
+  },
+  "out": {
+    "signals": {
+      "base": "extracted_signals",
+      "pth": ["subjects", "sessions", "runs"],
+      "hasdirs": false,
+      "signals+": "signal_sess{:02d}_run{:02d}_",
+      "f_signals+": "filtered_signal_sess_{:02d}_run{:02d}_"
+    },
+    "sess_mask": {
+      "base": "sess_mask",
+      "pth": ["subjects", "sessions", "runs"],
+      "hasdirs": false,
+      "roi_mask": "sess_mask.nii"
+    }
+  },
+  "res": {
+    "base": "results",
+    "hasdirs": false,
+    "sig": "signals",
+    "corr": "corr_mtx"
+  }
+}
+
