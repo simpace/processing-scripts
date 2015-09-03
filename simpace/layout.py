@@ -2,7 +2,25 @@ from __future__ import print_function, division
 import os 
 import os.path as osp
 import json
+import re
 import glob as gb
+from six import string_types
+
+def _get_key_dict(dlayo, entities = ["subjects", "sessions", "runs"]):
+    """
+    ["subjects", "sessions", "runs"] are the entities of the directory layout
+    return a dict with the keys 
+    eg: 
+    dkeys["subjects"] == 'sub'
+    """
+
+    dkeys = {}
+    for ent in entities:
+        assert ent in dlayo
+        assert "key" in dlayo[ent]
+        dkeys[ent] = dlayo[ent]["key"]
+    
+    return dkeys 
 
 def get_layout(jsonfile, dbase=None, verbose=False):
     """
@@ -31,13 +49,46 @@ def get_layout(jsonfile, dbase=None, verbose=False):
         msg = " {} is not a directory".format(dbase)
         raise ValueError(msg)
     else:
-        dlayo['base'] = dbase
+        if 'base' in dlayo:
+            dlayo['base'] = dbase
 
     return dlayo 
 
+# !!! to be implemented
+# sub_str = lo._format(sub_pth, dstate)
+
+def _format(toformat, fdict, failsifnotcomplete=True):
+    """
+    takes a string to format, a dict that may contain too many keys,
+    remove the uncessary keys and returns the formated string. 
+    """
+    #assert type(toformat) in [str, unicode]
+    assert isinstance(toformat, string_types)
+
+    if failsifnotcomplete:
+        # check that all keys in the string have a corresponding value in fdic
+        #!!! to be implemented
+        pass
+    return toformat.format(**fdict)
+
+#    reg = '\{([a-z:]*)\}' #should capture the {aa:bb} in the string
+#    p = re.compile(reg)
+#    args = p.findall(toformat)
+#    reduced_fdic = {}
+#    for arg in args:
+#        if arg:
+#            k,v = arg.split(':')
+#            assert k in fdict
+#            reduced_fdic[k] = fdict[k]
+#    
+
 def _get_pth(dlayo, key, verbose=False):
     """
-    construct the path, the file name, and the dictionary of keys for the path and file name 
+    construct the path, the file name, and the dictionary of keys for the path  
+    returns
+    -------
+    strpth: string
+    pthdic: dict 
     """
 
     try:
@@ -47,7 +98,7 @@ def _get_pth(dlayo, key, verbose=False):
 
     strpth = dlayo['base'] 
     pdic = {}
-    # first construct the previous path of this key with "base" and "dirs"
+    # first construct the *previous* path of this key with "base" and "key-val"
     for p in dlayo[key]['pth']:
         base = dlayo[p]['base']
         add_dir = ''
@@ -65,18 +116,24 @@ def _get_pth(dlayo, key, verbose=False):
 
 def _get_glb(dlayo, key, verbose=False):
     """
-    construct the path, the file name, and the dictionary of keys for the path and file name 
+    construct the path, the file name, and the dictionary of keys for the file name 
+    returns:
+    --------
+    the string corresponding to the glob pattern 
     """
     try:
         assert key in dlayo
     except:
         print("Key {} not in dict keys {}".format(key, dlayo.keys()))
 
+    if 'glb' not in dlayo[key]:
+        raise ValueError(" 'glb' is not a key for '{}'".format(key))
+
     # return string if simply a string
     if type(dlayo[key]['glb']) in (str, unicode):
         return dlayo[key]['glb'], {}
 
-    # construct file name using 'glb' 
+    # construct file name using the 'glb' section of dlayo[key] 
     strglb = ''
     fdic = {}
     for k in dlayo[key]['glb']:
@@ -89,6 +146,91 @@ def _get_glb(dlayo, key, verbose=False):
             raise ValueError, "k {} key {} unknown".format(k, key)
 
     return strglb, fdic
+
+def _get_pthglb(dlayo, key, verbose=False):
+    """
+    """
+    pth, pth_dict = _get_pth(dlayo, key, verbose=verbose)
+    glb, glb_dict = _get_glb(dlayo, key, verbose=verbose)
+
+    pthglb_dict = pth_dict.copy()
+    pthglb_dict.update(glb_dict)
+
+    return osp.join(pth, glb), pthglb_dict
+
+def _get_apthglb(dlayo, key, dstate, verbose=False):
+    """
+    """
+    pthglb, _ = _get_pthglb(dlayo, key, verbose=verbose)
+    return osp.join(pthglb).format(**dstate)
+
+def _get_apth(dlayo, key, dstate, verbose=False):
+    """
+    get a path, format it with dstate
+    """
+    pth, _ = _get_pth(dlayo, key, verbose=verbose)
+    return osp.join(pth).format(**dstate)
+
+
+def _get_oneof(dlayo, key, verbose=False):
+    """
+    pattern for one directory 
+    """
+    pth, pth_dict = _get_pth(dlayo, key, verbose=verbose)
+    if 'hasdirs' in dlayo[key] and (dlayo[key]['hasdirs'] is True):
+        pth = osp.join(pth, dlayo[key]['key'] + dlayo[key]['val'])
+        pth_dict[dlayo[key]['key']] = None
+    else:
+        # only implemented when there are multiple directories
+        raise ValueError("{} has not multiple dirs".format(key))
+        
+    return pth, pth_dict 
+
+def _get_aoneof(dlayo, key, dstate, verbose=False):
+    """
+    one directory with dstate to instanciate the sub and sess
+    """
+    pth, _pth_dict = _get_oneof(dlayo, key, verbose=verbose)
+
+    return pth.format(**dstate)
+
+def _get_alistof(dlayo, key, dstate={}, return_idxs=False, verbose=False):
+    """
+    for list of directories (ie subjects, sessions)
+    """
+    apth = _get_apth(dlayo, key, dstate,  verbose=verbose)
+    apthglb = _get_apthglb(dlayo, key, dstate, verbose=verbose)
+
+    if 'hasdirs' in dlayo[key] and (dlayo[key]['hasdirs'] is True):
+        # !!! TODO : here we should not check hasdirs, but if there are several values
+        apth_kv = osp.join(apth, dlayo[key]['key'] + dlayo[key]['val'])
+        lglb = len(gb.glob(apthglb))
+        vals = range(1,lglb+1)  # TODO : make it more general, this is only 
+                                # if the values are integers
+        if return_idxs:
+            return vals, [apth_kv.format(**{dlayo[key]['key']:val}) for val in vals]
+        else:
+            return [apth_kv.format(**{dlayo[key]['key']:val}) for val in vals]
+
+    else: 
+        assert return_idxs == False # cannot return idxs if not a list of dirs
+        return gb.glob(apthglb)
+        # raise ValueError("{} has not multiple dirs".format(key))
+
+def _get_aunique(dlayo, key, dstate={}, check_exists=True):
+
+    apthglb = _get_apthglb(dlayo, key, dstate, verbose=False)
+    files = gb.glob(apthglb)
+    if len(files) != 1:
+        raise ValueError(" key '{}' is suppose to yield only one file".format(key))
+    else:
+        if check_exists:
+            if not osp.isfile(files[0]):
+                raise ValueError(" file/dir '{}' does not exist".format(files[0]))
+    return files[0]
+
+
+    
 
 def _check_dict_full(adic, verbose=False):
     """

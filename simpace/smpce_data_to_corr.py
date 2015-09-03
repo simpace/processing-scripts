@@ -1,18 +1,15 @@
-import shutil
-import os 
 import os.path as osp
 import glob as gb
 import json
 import numpy as np
+import argparse
 #from six import string_types
-#
 from nilearn import masking as msk
 from nilearn._utils import concat_niimgs
 # from nilearn.image.image import _compute_mean
-#
 import utils._utils as ucr
 import utils.setup_filenames as suf 
-import argparse
+import layout as lo
 
 DIRLAYOUT = 'directory_layout.json'
 DATAPARAM = 'data_parameters.json'
@@ -24,7 +21,7 @@ def get_params(dbase, verbose=False):
     -----------
     dbase:  string
             base directory containing subjects directory
-            and jason files
+            *and* jason files
     """
 
     # Read json files at the base directory
@@ -32,8 +29,7 @@ def get_params(dbase, verbose=False):
     fn_data = osp.join(dbase, DATAPARAM)
     fn_anal = osp.join(dbase, ANALPARAM)
 
-    with open(fn_layo) as flayo:
-        dlayo = json.load(flayo)
+    dlayo = lo.get_layout(fn_layo, dbase=dbase) #json.load(flayo)
     with open(fn_data) as fdata:
         ddata = json.load(fdata)
     with open(fn_anal) as fanal:
@@ -41,6 +37,7 @@ def get_params(dbase, verbose=False):
 
     params = {'layout': dlayo, 'data': ddata, 'analysis': danal}
     return params
+
 
 def process_all(dbase, params=None, verbose=False):
     """
@@ -56,109 +53,93 @@ def process_all(dbase, params=None, verbose=False):
     dlayo = params['layout']
     ddata = params['data']
 
-    # loop over subjects
-    subj_idx = range(1,ddata['nb_sub']+1) # starts at 1, hence + 1
-    subj_dirs = [osp.join(dbase, (dlayo['dir']['sub+']).format(idx)) for idx in subj_idx]
-    # check all subj_dirs exists
-    for sub_dir in subj_dirs:
-        assert osp.isdir(sub_dir), "sub_dir"
+    # make state dict:
+    dkeys = lo._get_key_dict(dlayo, entities = ["subjects", "sessions", "runs"])
+    dstate = {}
+    for k in dkeys: 
+        dstate[dkeys[k]] = None
+   
+    idxs, sub_dirs = lo._get_alistof(dlayo, "subjects", dstate, return_idxs=True)
 
     subjs_info = {}
-    sub_curr = {}
-    for sub_idx, sub_dir in enumerate(subj_dirs, 1): # start idx at 1
-        sub_curr['sub_idx'] = sub_idx
-        sub_curr['sub_dir'] = sub_dir
-        sub_str = (dlayo['dir']['sub+']).format(sub_idx)
-        subjs_info[sub_str] =  do_one_subject(sub_curr, params, verbose=verbose) 
+    for sub_idx, sub_dirs in zip(idxs, sub_dirs): # start idx at 1
+        dstate[dkeys["subjects"]] = sub_idx
+        subject_str = lo._get_aoneof(dlayo, "subjects", dstate)
+        if verbose: print("subject_str, dstate:",  subject_str, dstate)
+        subjs_info[subject_str] = do_one_subject(dstate, dkeys, params, verbose=verbose) 
 
     return subjs_info
 
-def do_one_subject(sub_curr, params, verbose=False):
+def do_one_subject(dstate, dkeys, params, verbose=False):
     """
     launch sessions processing for sub_curr 
 
     parameters:
     -----------
-    sub_curr: dict 
-            contains subject base directory
+    dstate: dict 
             contains subject index 
+    dkeys: dict 
+            contains keys for entities  ["subjects", "sessions", "runs"]
     params: dict
             parameters for layout, data and analysis
             
     """
-    sub_idx, sub_dir = sub_curr['sub_idx'], sub_curr['sub_dir']
-    nb_sess = params['data']['nb_sess']
     dlayo = params['layout']
-    sess_idx = range(1, nb_sess+1)
-    sess_dirs = [osp.join(sub_dir, (dlayo['dir']['sess+']).format(idx)) for idx in sess_idx]
+    idxs, sess_dirs = lo._get_alistof(dlayo, "sessions", dstate, return_idxs=True)
 
-    sesss_info = {} 
-    sess_curr = {}
-    for sess_idx, sess_dir in enumerate(sess_dirs, 1): # start idx at 1
-        sess_curr['sess_idx'] = sess_idx
+    sesss_info, sess_curr = {}, {}
+    for sess_idx, sess_dir in zip(idxs, sess_dirs): 
+        dstate[dkeys["sessions"]] = sess_idx
         sess_curr['sess_dir'] = sess_dir
-        sess_str = (dlayo['dir']['sess+']).format(sess_idx)
-        if verbose: print('\n' + '---'*11  + "\n" + sess_str)
-        sesss_info[sess_str] = do_one_sess(sess_curr, sub_curr, params, verbose=verbose) 
+        if verbose: print('\n' + '-'*33  + "\n" + sess_dir)
+        if verbose: print("sess_dir, dstate:",  subject_str, dstate)
+        sesss_info[sess_dir] = None #do_one_sess(dstate, dkeys, params, verbose=verbose) 
 
     return sesss_info
     
-def do_one_sess(sess_curr, sub_curr, params, verbose=False):
+def do_one_sess(dstate, dkeys, params, verbose=False):
     """
     launch runs processing for sess_curr 
 
     parameters:
     -----------
-    sess_curr: dict 
-            contains sess base directory
-            contains sess index 
+    dstate: dict 
+            contains subject and sess index 
+    dkeys: dict 
+            contains keys for entities  ["subjects", "sessions", "runs"]
     params: dict
             parameters for layout, data and analysis
     """            
 
-    sess_idx = sess_curr['sess_idx']
-    sess_dir = sess_curr['sess_dir']
-    sub_idx = sub_curr['sub_idx']
+    dlayo = params['layout']
+    sess_curr = {}
+
+    sess_idx = dstate[dkeys["sessions"]]
+    sub_idx = dstate[dkeys["subjects"]]
     nb_runs = params['data']['nb_run'] 
     assert nb_runs == 4 # 4debug
 
-    dlayo = params['layout']
-
-    runs_dir = osp.join(sess_dir, dlayo['dir']['runs']) # should be preproc
-    sess_curr['dir_runs'] = runs_dir
-
-    dir_smooth_imgs = osp.join(runs_dir, dlayo['dir']['smooth'])
-    sess_curr['dir_smooth_imgs'] = dir_smooth_imgs
-
-    sess_curr['droi'] = osp.join(runs_dir, dlayo['atlas']['dir']) # 'registered_files'
-    sess_curr['roi_prefix'] = dlayo['atlas']['prepat']            # 'rraal_*.nii'     
-    sess_curr['dsig'] = osp.join(runs_dir, dlayo['out']['signals']['dir']) 
-
+    runs_dir = lo._get_apth(dlayo, "runs", dstate) # should be preproc
+    smoothed_dir = lo._get_apth(dlayo, "smoothed", dstate) #  preproc/smooth
+    aal_dir = lo._get_apth(dlayo, "aal_roi", dstate) #  preproc/...
+    aal_files = lo._get_alistof(dlayo, "aal_roi", dstate) #  
+    signals_dir = lo._get_apth(dlayo, "signals", dstate)
+    mvtfile = lo._get_aunique(dlayo, "mvt6params", dstate)
+    csf_file = lo._get_aunique(dlayo, "csf_mask", dstate)
+    wm_file = lo._get_aunique(dlayo, "wm_mask", dstate)
+    
     save_is_true = params['analysis']['write_signals']
     if save_is_true: 
-        # rm existing and recreate signal directory
-        suf.rm_and_create(sess_curr['dsig'])
-
-    sess_curr['dreal'] = osp.join(runs_dir, dlayo['dir']['realign'])
-
-    #- csf dir and file
-    sess_curr['csf_dir'] = osp.join(runs_dir, dlayo['csf']['dir'])
-    csf_file = gb.glob(osp.join(sess_curr['csf_dir'], dlayo['csf']['roi_mask']))
-    if not csf_file: print("glob empty: {} {}".format(
-                                sess_curr['csf_dir'], dlayo['csf']['roi_mask']))
-    csf_file = suf._check_glob_res(csf_file, ensure=1, files_only=True)
-    sess_curr['csf_filename'] =  dlayo['csf']['roi_mask']
-
-    #- wm dir and file
-    sess_curr['wm_dir'] = osp.join(runs_dir, dlayo['wm']['dir'])
-    wm_file = gb.glob(osp.join(sess_curr['wm_dir'], dlayo['wm']['roi_mask']))
-    if not wm_file: print("glob empty: {} {}".format(
-                                sess_curr['wm_dir'], dlayo['wm']['roi_mask']))
-    wm_file = suf._check_glob_res(wm_file, ensure=1, files_only=True)
-    sess_curr['wm_filename'] =  dlayo['wm']['roi_mask']
+        suf.rm_and_create(signals_dir)
 
     #- Get runs' filenames
     #------------------------
+    runs = []
+    for idx_run in range(1,nb_runs+1):
+        ds = dstate.copy()
+        ds.update({dkeys["runs"]:idx_run})
+        runs.append(lo._get_alistof(dlayo, "smoothed", ds).sort())
+
     pat_imgs_files = dlayo['pat']['sub+sess+run+']+"*.nii*"
                                 # requires idx for sub, sess and run
     runs_pat = [pat_imgs_files.format(sub_idx, sess_idx, run_idx) \
@@ -186,16 +167,7 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
 
     sess_curr['mask'] = sess_mask
 
-    # TODO
-    # check mask is reasonable - how ???
-
-    # - mvt file
-    # example : mvtfile = osp.join(dreal,'rp_asub01_sess01_run01-0006.txt')
-    # /!\ will always be run01 for spm /!\
-    mvtpat = dlayo['spm_mvt']['mvtrun1+'].format(sub_idx, sess_idx) 
-    mvtfile = gb.glob(osp.join(sess_curr['dreal'], mvtpat))
-    mvtfile = suf._check_glob_res(mvtfile, ensure=1, files_only=True)
-    sess_curr['mvtfile'] = mvtfile
+    # TODO: check mask is reasonable - how ???
 
     # - parameter file for condition names
     param_pattern = (dlayo['pat']['sub+sess+']).format(sub_idx, sess_idx)

@@ -1,8 +1,9 @@
 {
-  "base": "./",
+  "base": "",
   "disk_hierarchy": ["subjects", "sessions", "runs"],
   "subjects": {
     "base": "",
+    "pth": "",
     "hasdirs": true,
     "key": "sub",
     "val": "{sub:02d}",
@@ -37,6 +38,14 @@
     "post": "????.nii*",
     "glb": ["pre", "subjects", "sessions", "runs", "post"]
   },
+  "mvt6params": {
+    "base": "realign",
+    "pth": ["subjects", "sessions", "runs"],
+    "hasdirs": false,
+    "pre": "rp_a",
+    "post": "run01-000?.txt",
+    "glb": ["pre", "subjects", "sessions", "post"]
+  },
   "gm_mask": {
     "base": "gm_in_func_res",
     "pth": ["subjects", "sessions", "runs"],
@@ -64,26 +73,37 @@
     "hasdirs": false,
     "glb": "rraal_*.nii"
   },
-  "out": {
-    "signals": {
-      "base": "extracted_signals",
-      "pth": ["subjects", "sessions", "runs"],
-      "hasdirs": false,
-      "signals+": "signal_sess{:02d}_run{:02d}_",
-      "f_signals+": "filtered_signal_sess_{:02d}_run{:02d}_"
-    },
-    "sess_mask": {
-      "base": "sess_mask",
-      "pth": ["subjects", "sessions", "runs"],
-      "hasdirs": false,
-      "roi_mask": "sess_mask.nii"
-    }
+  "signals": {
+    "base": "extracted_signals",
+    "pth": ["subjects", "sessions", "runs"],
+    "hasdirs": false,
+    "optional": true,
+    "pre": "signal",
+    "post": "",
+    "lnk": "_",
+    "glb": ["pre", "subjects", "sessions", "runs"]
+  },
+  "fsignals": {
+    "base": "extracted_signals",
+    "pth": ["subjects", "sessions", "runs"],
+    "hasdirs": false,
+    "optional": true,
+    "pre": "filt_sig",
+    "post": "",
+    "lnk": "_",
+    "glb": ["pre", "subjects", "sessions", "runs"]
+  },
+  "sess_mask": {
+    "base": "sess_mask",
+    "pth": ["subjects", "sessions", "runs"],
+    "hasdirs": false,
+    "roi_mask": "sess_mask.nii"
   },
   "res": {
     "base": "results",
     "hasdirs": false,
+    "createdir": false,
     "sig": "signals",
     "corr": "corr_mtx"
   }
 }
-
