@@ -137,7 +137,7 @@ def _format(toformat, fdict, failsifnotcomplete=True):
 
 def _get_pth(dlayo, key, glob=False, verbose=False):
     """
-    construct the path, the file name, and the dictionary of keys for the path  
+    construct the path and the dictionary of keys for the path  
     returns
     -------
     strpth: string
@@ -164,10 +164,14 @@ def _get_pth(dlayo, key, glob=False, verbose=False):
             # add the k-v liason in the future 
             add_dir = dlayo[p]['key'] + val
             pdic[dlayo[p]['key']] = None
-        strpth = osp.join(strpth, base, add_dir)
+        if add_dir == '':
+            strpth = osp.join(strpth, base)
+        else:
+            strpth = osp.join(strpth, base, add_dir)
         
     # then add the base of this specific key:
-    strpth = osp.join(strpth, dlayo[key]['base'])
+    if dlayo[key]['base'] != '':
+        strpth = osp.join(strpth, dlayo[key]['base'])
 
     if glob: 
         return strpth
@@ -217,7 +221,7 @@ def _get_glb(dlayo, key, glob=False, verbose=False):
                     val = '*'
                 else:
                     val = dlayo[k]['val']
-                #here : for the last k, we may not want to put the lnk
+                # for the last k, we may not want to put the lnk - it is now here
                 strglb += dlayo[k]['key'] + val + dlayo[k]['lnk']
                 fdic[dlayo[k]['key']] = None
             else:
@@ -274,14 +278,14 @@ def _get_apth(dlayo, key, dstate, verbose=False):
     """
     get a path, format it with dstate
     """
-    pth, _ = _get_pth(dlayo, key, verbose=verbose)
+    pth, _ = _get_pth(dlayo, key, glob=False, verbose=verbose)
     return osp.join(pth).format(**dstate)
 
 def _get_oneof(dlayo, key, verbose=False):
     """
     pattern for one directory 
     """
-    pth, pth_dict = _get_pth(dlayo, key, verbose=verbose)
+    pth, pth_dict = _get_pth(dlayo, key, glob=False, verbose=verbose)
     if 'hasdirs' in dlayo[key] and (dlayo[key]['hasdirs'] is True):
         pth = osp.join(pth, dlayo[key]['key'] + dlayo[key]['val'])
         pth_dict[dlayo[key]['key']] = None

@@ -25,25 +25,47 @@ def test_get_key_dict():
     dstate = lo._get_key_dict(dlayo, entities = ["subjects", "sessions", "runs"])
     assert dstate == key_dict_expected
 
-def test_get_pth():
+def test_get_pth_globFalse():
+    #  get pth with glob = False
 
-    pth, pth_dict = lo._get_pth(dlayo, 'subjects')
-    assert pth == DATABASEDIR + '/'
+    pth, pth_dict = lo._get_pth(dlayo, 'subjects', glob=False)
+    assert pth == DATABASEDIR
     assert pth_dict == {}
 
-    pth, pth_dict = lo._get_pth(dlayo, 'sessions')
+    pth, pth_dict = lo._get_pth(dlayo, 'sessions', glob=False)
     print("\n",pth)
-    expected_pth =  osp.join(DATABASEDIR, 'sub{sub:02d}') + '/'
-    print('wtf',expected_pth)
+    expected_pth =  osp.join(DATABASEDIR, 'sub{sub:02d}')
+    print('expected_pth: ',expected_pth)
     assert pth == expected_pth
     assert pth_dict == {u'sub': None}
 
-    pth, pth_dict = lo._get_pth(dlayo, 'runs')
+    pth, pth_dict = lo._get_pth(dlayo, 'runs', glob=False)
     print("\n",pth)
     expected_pth = osp.join(DATABASEDIR, 'sub{sub:02d}', 'sess{sess:02d}', 'preproc') 
-    print('wtf',expected_pth)
+    print('expected_pth: ',expected_pth)
     assert pth == expected_pth
     assert pth_dict == {u'sess': None, u'sub': None}
+
+
+def test_get_pth_globTrue():
+    #  get pth with glob = True
+
+    pth = lo._get_pth(dlayo, 'subjects', glob=True)
+    assert pth == DATABASEDIR
+
+    pth = lo._get_pth(dlayo, 'sessions', glob=True)
+    print("\n",pth)
+    expected_pth =  osp.join(DATABASEDIR, 'sub*')
+    print('expected_pth: ',expected_pth)
+    assert pth == expected_pth
+
+    pth = lo._get_pth(dlayo, 'runs', glob=True)
+    print("\n",pth)
+    expected_pth = osp.join(DATABASEDIR, 'sub*', 'sess*', 'preproc') 
+    print('expected_pth: ',expected_pth)
+    assert pth == expected_pth
+
+
 
 def test_get_pthglb():
 
