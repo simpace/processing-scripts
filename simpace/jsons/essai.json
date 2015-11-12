@@ -51,22 +51,21 @@
     "pth": ["subjects", "sessions", "runs"],
     "hasdirs": false,
     "glb": "gm_func_res.nii",
-    "link": "../coreg/rgm_anatres.nii"
+    "islink": true 
   },
   "wm_mask": {
     "base": "wm_in_func_res",
     "pth": ["subjects", "sessions", "runs"],
     "hasdirs": false,
     "glb": "wm_func_res.nii",
-    "link": "../coreg/rwm_anatres.nii"
+    "islink": true 
   },
   "csf_mask": {
     "base": "csf_in_func_res",
     "pth": ["subjects", "sessions", "runs"],
     "hasdirs": false,
-    "glb": "csf_func_res.nii",
-    "link": "../coreg/rcsf_anatres.nii"
-  },
+    "glb": "csf_func_res_final.nii.gz"
+      },
   "aal_roi": {
     "base": "coreg",
     "pth": ["subjects", "sessions", "runs"],
@@ -97,7 +96,7 @@
     "base": "sess_mask",
     "pth": ["subjects", "sessions", "runs"],
     "hasdirs": false,
-    "roi_mask": "sess_mask.nii"
+    "glb": "sess_mask.nii"
   },
   "res": {
     "base": "results",
@@ -105,5 +104,13 @@
     "createdir": false,
     "sig": "signals",
     "corr": "corr_mtx"
+  },
+  "conditions": {
+    "base": "",
+    "pth": ["subjects", "sessions"],
+    "hasdirs": false,
+    "pre": "",
+    "post": "params.json",
+    "glb": ["subjects", "sessions", "post"] 
   }
 }
