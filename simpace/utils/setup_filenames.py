@@ -1,7 +1,5 @@
 """Script to setup dicom directories to standard format
 """
-
-
 import os, sys, stat
 import numpy as np
 import re
@@ -16,11 +14,10 @@ from six import string_types
 
 # export MATLAB_INSTALLED=1 
 MATLAB_INSTALLED = os.environ.get('MATLAB_INSTALLED')
-#if MATLAB_INSTALLED is not None:
-import nipype.interfaces.spm.utils as spmu
-import nipype.interfaces.matlab as matlab
+if MATLAB_INSTALLED is not None:
+    import nipype.interfaces.spm.utils as spmu
+    import nipype.interfaces.matlab as matlab
 #
-
 
 #-----------------------------------------------------------------------------
 # Functions
