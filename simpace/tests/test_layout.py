@@ -6,6 +6,9 @@ from __future__ import division, print_function, absolute_import
 import layout as lo 
 import os.path as osp 
 #import smpce_data_to_corr as stc
+from nose.tools import (assert_true, 
+                        assert_false, 
+                        assert_equal)
 
 JSONTEST = '/home/jb/code/simpace/simpace/jsons/essai.json'
 DATABASEDIR = '/home/jb/data/simpace/rename_files'
@@ -66,10 +69,66 @@ def test_get_pth_globTrue():
     assert pth == expected_pth
 
 
+def test_get_glb_globFalse():
+    glob=False 
+    verbose=False
 
-def test_get_pthglb():
+    fil, fdict = lo._get_glb(dlayo, 'subjects', glob=glob, verbose=verbose)
+    expected_fil =  'sub*' 
+    assert fil == expected_fil
+    assert fdict == {}
+    
+    fil, fdict = lo._get_glb(dlayo, 'sessions', glob=glob, verbose=verbose)
+    expected_fil =  'sess*' 
+    assert fil == expected_fil
+    assert fdict == {}
 
-    pdir, ddir = lo._get_pthglb(dlayo, 'sessions')
+    fil, fdict = lo._get_glb(dlayo, 'smoothed', glob=glob, verbose=verbose)
+    expected_fil =  'srasub{sub:02d}_sess{sess:02d}_run{run:02d}-????.nii*' 
+    assert fil == expected_fil
+    assert fdict == {u'sess': None, u'run': None, u'sub': None}
 
+    fil, fdict = lo._get_glb(dlayo, 'wm_mask', glob=glob)
+    expected_fil =  'wm_func_res.nii' 
+    assert fil == expected_fil
+    assert fdict == {} 
+
+def test_get_glb_globTrue():
+    glob = True 
+    verbose = False
+    fdict = None
+
+    fil = lo._get_glb(dlayo, 'subjects', glob=glob, verbose=verbose)
+    expected_fil =  'sub*' 
+    assert fil == expected_fil
+    
+    fil = lo._get_glb(dlayo, 'sessions', glob=glob, verbose=verbose)
+    expected_fil =  'sess*' 
+    assert fil == expected_fil
+
+    fil = lo._get_glb(dlayo, 'smoothed', glob=glob, verbose=verbose)
+    expected_fil =  'srasub*_sess*_run*-????.nii*' 
+    assert fil == expected_fil
+    assert fdict == None 
+
+    fil = lo._get_glb(dlayo, 'wm_mask', glob=glob)
+    expected_fil =  'wm_func_res.nii' 
+    assert fil == expected_fil
+    assert fdict == None 
+
+def test_get_pthglb_globFalse():
+
+    glob =  False
+    verbose = False
+
+    fil, fdict = lo._get_pthglb(dlayo, 'subjects', glob=glob, verbose=verbose)
+    expected_fil =  osp.join(DATABASEDIR, 'sub*')
+    assert fil == expected_fil
+    assert fdict == {}
+
+    fil, fdict = lo._get_pthglb(dlayo, 'sessions', glob=glob, verbose=verbose)
+    expected_fil =  osp.join(DATABASEDIR, 'sub{sub:02d}/sess*') 
+    assert fil == expected_fil
+    assert fdict == {u'sub': None}
 
 
