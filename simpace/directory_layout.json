@@ -25,16 +25,16 @@
 	},
 	"csf": {
 		"@dir": "@dir@runs@csf",
-		"dir": "csf_mask",
-		"roi_mask": "csf_map_final.nii*"
+		"dir": "csf_in_func_res",
+		"roi_mask": "csf_func_res_final.nii*"
 	},
 	"wm": {
 		"@dir": "@dir@runs@wm",
-		"dir": "wm_mask",
-		"roi_mask": "wm_map_final.nii*"
+		"dir": "wm_in_func_res",
+		"roi_mask": "wm_func_res_final.nii*"
 	},
 	"atlas": {
-		"dir": "registered_files",
+		"dir": "coreg",
 		"prepat": "rraal_*.nii"
 	},
 	"out": {
