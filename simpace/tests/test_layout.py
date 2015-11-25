@@ -131,4 +131,24 @@ def test_get_pthglb_globFalse():
     assert fil == expected_fil
     assert fdict == {u'sub': None}
 
+def test_get_aunique():
+
+    dstate = {'sess': 2, 'run': 1, 'sub': 1}
+    csf_mask = lo._get_aunique(dlayo, "csf_mask", dstate)
+    expected_csf_mask = osp.join(DATABASEDIR, 
+                        'sub01/sess02/preproc/csf_in_func_res/csf_func_res_final.nii.gz')
+    assert csf_mask == expected_csf_mask
+
+def test_get_alistof():
+
+    dstate = {'sess': 2, 'run': 1, 'sub': 1}
+    aal_files = lo._get_alistof(dlayo, "aal_roi", dstate)
+    expected_len = 116
+    aal_files.sort()
+    expected_first_file = DATABASEDIR + \
+                        u'/sub01/sess02/preproc/coreg/rraal_Amygdala_L__________.nii'   
+    assert expected_len == len(aal_files) 
+    assert aal_files[0] == expected_first_file
+
+    
 
