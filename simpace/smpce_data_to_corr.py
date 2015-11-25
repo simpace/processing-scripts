@@ -16,6 +16,8 @@ ANALPARAM = 'analysis_parameters.json'
 
 def get_params(dbase, verbose=False):
     """
+    Read json files at the base directory dbase
+    
     parameters:
     -----------
     dbase:  string
@@ -50,7 +52,7 @@ def process_all(dbase, params=None, verbose=False):
         params = get_params(dbase, verbose=verbose)
     
     dlayo = params['layout']
-    ddata = params['data']
+    # ddata = params['data']
 
     # make state dict:
     dkeys = lo._get_key_dict(dlayo, entities = ["subjects", "sessions", "runs"])
@@ -91,8 +93,8 @@ def do_one_subject(dstate, dkeys, params, verbose=False):
         dstate[dkeys["sessions"]] = sess_idx
         sess_curr['sess_dir'] = sess_dir
         if verbose: print('\n' + '-'*33  + "\n" + sess_dir)
-        if verbose: print("sess_dir, dstate:",  subject_str, dstate)
-        sesss_info[sess_dir] = None #do_one_sess(dstate, dkeys, params, verbose=verbose) 
+        if verbose: print("sess_dir, dstate:",  sess_dir, dstate)
+        sesss_info[sess_dir] = do_one_sess(dstate, dkeys, params, verbose=verbose) 
 
     return sesss_info
     
@@ -145,7 +147,7 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
     sess_mask = msk.compute_multi_epi_mask(runs, lower_cutoff=0.2, 
                     upper_cutoff=0.85, connected=True, opening=2, threshold=0.5)
     suf.rm_and_create(ptr['dir_mask'])
-    if params['analysis']['apply_sess_mask']: sess_mask.to_filename(mask_file)
+    if params['analysis']['apply_sess_mask']: sess_mask.to_filename(ptr['mask_file'])
     # TODO: check mask is reasonable - how ???
 
     # create the directory to write the extracted signals in

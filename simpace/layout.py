@@ -137,7 +137,11 @@ def _format(toformat, fdict, failsifnotcomplete=True):
 
 def _get_pth(dlayo, key, glob=False, verbose=False):
     """
-    construct the path and the dictionary of keys for the path  
+    construct the path to this key and the dictionary of keys for the path  
+    if glob = True: returns a path that should be glob
+    if glob = False: returns a path and a dict, 
+              Use the dict dstate to instanciate
+
     returns
     -------
     strpth: string
@@ -284,6 +288,16 @@ def _get_apth(dlayo, key, dstate, verbose=False):
 def _get_oneof(dlayo, key, verbose=False):
     """
     pattern for one directory 
+    first get the path for the entity, then check that this entity has
+    directories, last append entity_key, entity_val to this path
+    example : /home/../sub{sub:02d} for entity 'subjects'
+
+    returns:
+    --------
+    pth: string
+        the path for one of the directory
+    pth_dict: dict
+        contains keys to be filled to get an actual path
     """
     pth, pth_dict = _get_pth(dlayo, key, glob=False, verbose=verbose)
     if 'hasdirs' in dlayo[key] and (dlayo[key]['hasdirs'] is True):
@@ -297,7 +311,7 @@ def _get_oneof(dlayo, key, verbose=False):
 
 def _get_aoneof(dlayo, key, dstate, verbose=False):
     """
-    one directory with dstate to instanciate the sub and sess
+    Get oneof and instanciate with dstate 
     """
     pth, _pth_dict = _get_oneof(dlayo, key, verbose=verbose)
 
@@ -308,13 +322,13 @@ def _get_alistof(dlayo, key, dstate={}, return_idxs=False, verbose=False):
     for list of directories (ie subjects, sessions)
     """
     apth = _get_apth(dlayo, key, dstate,  verbose=verbose)
-    apthglb = _get_apthglb(dlayo, key, dstate, verbose=verbose)
+    apthglb = _get_apthglb(dlayo, key, dstate, glob=False, verbose=verbose)
 
     if 'hasdirs' in dlayo[key] and (dlayo[key]['hasdirs'] is True):
         # !!! TODO : here we should not check hasdirs, but if there are several values
         apth_kv = osp.join(apth, dlayo[key]['key'] + dlayo[key]['val'])
         lglb = len(gb.glob(apthglb))
-        vals = range(1,lglb+1)  # TODO : make it more general, this is only 
+        vals = range(1, lglb+1)  # TODO : make it more general, this is only 
                                 # if the values are integers
         if return_idxs:
             return vals, [apth_kv.format(**{dlayo[key]['key']:val}) for val in vals]
@@ -330,7 +344,7 @@ def _get_aunique(dlayo, key, dstate={}, check_exists=True):
     """
     first _get_aphtglb then check if only one element (file) is returned
     """
-    apthglb = _get_apthglb(dlayo, key, dstate, glob=True, verbose=False)
+    apthglb = _get_apthglb(dlayo, key, dstate, glob=False, verbose=False)
     files = gb.glob(apthglb)
     if len(files) != 1:
         raise ValueError(" key '{}' is suppose to yield exactly one file".format(key) +
