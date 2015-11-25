@@ -22,6 +22,8 @@ from nipy.algorithms.resample import resample # ,resample_img2img
 from nipy.core.reference import coordinate_map as cmap
 from nipy.core.reference.coordinate_system import CoordSysMaker
 from nipy.labs.mask import compute_mask #, compute_mask_files
+import pdb
+
 
 TINY = np.finfo('float').eps * 1000
 
@@ -270,7 +272,7 @@ def _yield_roi_mask(roi_files, imgdim=3, roi_threshold=0.5):
         yield label, roi_mask
 
 def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None, 
-                                            minvox=1, verbose=False):
+                                            minvox=1, verbose=False, signal_type='mean', n_PC=5):
     """
     Extract signals from list of 4d nifti 
     
@@ -340,8 +342,18 @@ def extract_signals(rois_dir, roi_prefix, fn_img4d, mask=None,
                                     this_msk_nb_vox, minvox)
         else:
             # dimension should be (# of voxels in ROI and mask, time)
-            signals[label] = img_arr[this_msk].mean(axis=0)
             info[label] = this_msk_nb_vox
+
+            if signal_type == 'mean':
+                signals[label] = img_arr[this_msk].mean(axis=0)
+            elif signal_type == 'PC':
+                data = img_arr[this_msk] #data is Nvox x Ntrs
+
+                data = _standardize(np.transpose(data), verbose=verbose) #Ntrs x Nvox
+        
+                comp, _, _ = lin.svd(data, full_matrices=False)
+            
+                signals[label] = comp[:, :n_PC]
 
     return signals, issues, info
 
@@ -470,23 +482,36 @@ def extract_mvt(mvtfile, run_idx, run_len, standardize=True, verbose=False):
 # -     return csf_arr, csf_labs
 
 def extract_roi_run(droi, roi_filename, run_4d, check_lengh=None,
-        standardize=True, verbose=False):
+        standardize=True, verbose=False, signal_type='mean', n_PC=5):
 
     #--- get roi----------#
     roi_signals, roi_issues, roi_info = \
-                    extract_signals(droi, roi_filename, run_4d)
+                    extract_signals(droi, roi_filename, run_4d, mask=None, 
+                        minvox=1, verbose=verbose, signal_type=signal_type, n_PC=n_PC)
+
+    #mask=None, minvox=1, verbose=False, signal_type='mean', n_PC=5):
 
     #- check roi_signals ok ?
     assert len(roi_signals) == 1 # only one signal in dict
     roi_key = roi_signals.keys()[0]
     roi_arr = roi_signals[roi_key]
+
+
     if check_lengh is not None:
-        assert roi_arr.shape == (check_lengh,)
+        if signal_type=='mean':
+            assert roi_arr.shape == (check_lengh,)
+            Ncols=1
+        elif signal_type=='PC':
+            assert roi_arr.shape == (check_lengh,n_PC)
+            Ncols=n_PC
 
     # standardized roi_arr
     if standardize:
-        roi_arr = _standardize(roi_arr.reshape(roi_arr.shape[0], 1), 
+        roi_arr = _standardize(roi_arr.reshape(roi_arr.shape[0], Ncols), 
                                 verbose=verbose)
+        # to JB: why necessary to reshape given that size of array is checked above?
+        # roi_arr = _standardize(roi_arr, verbose=verbose)
+
     roi_labs = [roi_key]
     
     return roi_arr, roi_labs
