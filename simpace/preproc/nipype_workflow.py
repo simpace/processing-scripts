@@ -229,14 +229,14 @@ for isess, sess_dir in enumerate(sessions):
 
 	workflow_func.run()
 
-	os.system('python Pmaps.py ' + subject + ' ' + sess + ' ' + workflow_name_func)
+	os.system('python Pmaps_v2.py ' + subject + ' ' + sess + ' ' + workflow_name_func)
 
 
 	# FIX nipype file naming bug
-	full_file_name = glob(out_dir + prefix_toremove + suffix)
-	base_file_name = os.path.basename(full_file_name[0])
-	new_file_name = out_dir + prefix_toadd + base_file_name[len(prefix_toremove):]
-	os.rename(full_file_name[0], new_file_name)
+	# full_file_name = glob(out_dir + prefix_toremove + suffix)
+	# base_file_name = os.path.basename(full_file_name[0])
+	# new_file_name = out_dir + prefix_toadd + base_file_name[len(prefix_toremove):]
+	# os.rename(full_file_name[0], new_file_name)
 
 	os.system('gzip ' + workflow_dir + '/stc/a*.nii')
 	os.system('gzip ' + workflow_dir + '/realign/ra*.nii')
