@@ -43,7 +43,7 @@
     "pth": ["subjects", "sessions", "runs"],
     "hasdirs": false,
     "pre": "rp_a",
-    "post": "run01-000?.txt",
+    "post": "run01-0005.txt",
     "glb": ["pre", "subjects", "sessions", "post"]
   },
   "gm_mask": {
@@ -57,7 +57,7 @@
     "base": "wm_in_func_res",
     "pth": ["subjects", "sessions", "runs"],
     "hasdirs": false,
-    "glb": "wm_func_res.nii",
+    "glb": "wm_func_res_final.nii.gz",
     "islink": true 
   },
   "csf_mask": {

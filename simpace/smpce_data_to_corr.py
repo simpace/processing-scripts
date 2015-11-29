@@ -120,15 +120,32 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
     ptr = {}
     ptr['runs_dir'] = lo._get_apth(dlayo, "runs", dstate) # will be preproc
     ptr['smoothed_dir'] = lo._get_apth(dlayo, "smoothed", dstate) # ../smooth
+    ptr['signals_dir'] = lo._get_apth(dlayo, "signals", dstate)
+    #---------
     ptr['aal_dir'] = lo._get_apth(dlayo, "aal_roi", dstate) #  preproc/..
     ptr['aal_files'] = lo._get_alistof(dlayo, "aal_roi", dstate) #  
-    ptr['signals_dir'] = lo._get_apth(dlayo, "signals", dstate)
-    ptr['mvtfile'] = lo._get_aunique(dlayo, "mvt6params", dstate)
+    ptr['aal_glb'] = dlayo['aal_roi']['glb']
+    #---------
+    ptr['mvt_dir'] = lo._get_apth(dlayo, "mvt6params", dstate)
+    ptr['mvt_file'] = lo._get_aunique(dlayo, "mvt6params", dstate)
+    ptr['mvt_glb'] = lo._get_glb(dlayo, "mvt6params", glob=True, verbose=False)
+    #---------
+    ptr['csf_dir'] = lo._get_apth(dlayo, "csf_mask", dstate)
     ptr['csf_file'] = lo._get_aunique(dlayo, "csf_mask", dstate)
+    ptr['csf_glb'] = dlayo['csf_mask']['glb']
+    #---------
+    ptr['wm_dir'] = lo._get_apth(dlayo, "wm_mask", dstate)
     ptr['wm_file'] = lo._get_aunique(dlayo, "wm_mask", dstate)
-    # things that we want the names to create them later 
-    ptr['dir_mask'] = lo._get_apth(dlayo, "sess_mask", dstate)
-    ptr['mask_file'] = lo._get_apthglb(dlayo, "sess_mask", dstate)    
+    ptr['wm_glb'] = dlayo['wm_mask']['glb']
+    #---------
+    ptr['gm_dir'] = lo._get_apth(dlayo, "gm_mask", dstate)
+    ptr['gm_file'] = lo._get_aunique(dlayo, "gm_mask", dstate)
+    ptr['gm_glb'] = dlayo['gm_mask']['glb']
+    #--------- things that we want the names to create them later 
+    ptr['mask_dir'] = lo._get_apth(dlayo, "sess_mask", dstate)
+    ptr['mask_file'] = lo._get_aunique(dlayo, "sess_mask", dstate)    
+    ptr['mask_glb'] = dlayo['sess_mask']['glb']
+
     #- Get runs' filenames and sort them 
     #-------------------------------------
     runs = [] 
@@ -137,7 +154,9 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
         ds = dstate.copy()
         ds.update({dkeys["runs"]:idx_run})
         runs.append(sorted(lo._get_alistof(dlayo, "smoothed", ds)))
+
     ptr['runs'] = runs
+
     # Atlternative:
     #  runs = [ sorted(lo._get_alistof(dlayo, "smoothed", 
     #  lo.merge_two_dicts(dstate, {dkeys["runs"]:idx}))) for idx in range(1,nb_runs)]
@@ -146,7 +165,7 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
     #-----------------------------------------------------
     sess_mask = msk.compute_multi_epi_mask(runs, lower_cutoff=0.2, 
                     upper_cutoff=0.85, connected=True, opening=2, threshold=0.5)
-    suf.rm_and_create(ptr['dir_mask'])
+    suf.rm_and_create(ptr['mask_dir'])
     if params['analysis']['apply_sess_mask']: sess_mask.to_filename(ptr['mask_file'])
     # TODO: check mask is reasonable - how ???
 
@@ -169,46 +188,51 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
         ptr['motion'] = sess_param['motion'][idx_run-1] # sess_param['motion'] is 0 based
 
         runs_info["run{:02d}".format(idx_run)] = ptr #\
-                    # do_one_run(ptr, dstate, dkeys, params, verbose=verbose)
+        do_one_run(ptr, dstate, dkeys, params, verbose=verbose)
 
     return runs_info
 
-def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
+def do_one_run(ptr,  dstate, dkeys, params, verbose=False):  # run_curr, sess_curr, sub_curr,
     """
     """
     run_info = {}
+    dlayo = params['layout']
     nvol = params['data']['nb_vol']
     dt = params['data']['TR']
     nb_run = params['data']['nb_run']
 
-    file_names = run_curr['file_names']
-    run_idx = run_curr['run_idx']
+    file_names = ptr['file_names']
+    run_idx = dstate[dkeys["runs"]] #run_curr['run_idx']
     run_idx0 = run_idx - 1
     assert run_idx0 >= 0
     assert run_idx0 < nb_run
 
-    sess_idx = sess_curr['sess_idx']
-    mvt_cond = run_curr['motion']
-    dsig = sess_curr['dsig']
-    mask = sess_curr['mask']
+    # sess_idx = dstate[dkeys["sessions"]] # sess_curr['sess_idx']
+    mvt_cond = ptr['motion'] # run_curr['motion']
+    dsig = ptr['signals_dir'] # sess_curr['dsig']
+    mask = ptr['mask_file'] # sess_curr['mask']
 
     low_freq = params['analysis']['filter']['low_freq']
     high_freq = params['analysis']['filter']['high_freq']
     
     # signal file names
     #-------------------
-    _fn_sig = params['layout']['out']['signals']['signals+'] 
-    # _fn_fsig = params['layout']['out']['signals']['f_signals+'] 
-    fn_sig = osp.join(dsig, _fn_sig.format(sess_idx, run_idx) + mvt_cond)
-    # fn_fsig = osp.join(dsig, _fn_fsig.format(run_idx)+mvt_cond)
+    #_fn_sig = params['layout']['out']['signals']['signals+'] 
+    ## _fn_fsig = params['layout']['out']['signals']['f_signals+'] 
+    #fn_sig = osp.join(dsig, _fn_sig.format(sess_idx, run_idx) + mvt_cond)
+    ## fn_fsig = osp.join(dsig, _fn_fsig.format(run_idx)+mvt_cond)
+
+    fn_sig = lo._get_apthglb(dlayo, "signals", dstate, glob=False) + mvt_cond
+
+    # fn_fsig = lo._get_apthglb(dlayo, "fsignals", dstate, glob=False)
+    # fn_fsig = osp.join(fn_fsig, mvt_cond) 
 
     # extract signals and save them in preproc/roi_signals
     #-----------------------------------------------------
     min_vox_roi = params['analysis']['min_vox_in_roi']
     run_4d = concat_niimgs(file_names, ensure_ndim=4)
-    signals, _issues, _info = ucr.extract_signals(sess_curr['droi'],
-                                                  sess_curr['roi_prefix'], run_4d,
-                                                  mask=mask, minvox=min_vox_roi)   
+    signals, _issues, _info = ucr.extract_signals(ptr['aal_dir'], ptr['aal_glb'],  
+                                        run_4d, mask=mask, minvox=min_vox_roi, verbose=verbose)   
     # construct matrix of counfounds
     #-----------------------------------------------------
     arr_counf = []
@@ -216,7 +240,7 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     #--- get WM 
     if params['analysis']['apply_wm']:
         wm_arr, wm_labs = ucr.extract_roi_run(
-                            sess_curr['wm_dir'], sess_curr['wm_filename'], 
+                            ptr['wm_dir'], ptr['wm_glb'], 
                             run_4d, check_lengh=nvol, verbose=verbose)
         labs_counf = labs_counf + wm_labs
         arr_counf.append(wm_arr)
@@ -226,7 +250,7 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     #--- get CSF
     if params['analysis']['apply_csf']:
         csf_arr, csf_labs = ucr.extract_roi_run(
-                            sess_curr['csf_dir'], sess_curr['csf_filename'], 
+                            ptr['csf_dir'], ptr['csf_glb'], 
                             run_4d, check_lengh=nvol, verbose=verbose)
         labs_counf = labs_counf + csf_labs
         arr_counf.append(csf_arr)
@@ -236,7 +260,7 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     #--- get GR 
     if params['analysis']['apply_global_reg']:
         gr_arr, gr_labs = ucr.extract_roi_run(
-                            sess_curr['mask_dir'], sess_curr['mask_filename'], 
+                            ptr['mask_dir'], ptr['mask_glb'], 
                             run_4d, check_lengh=nvol, verbose=verbose)
         labs_counf = labs_counf + gr_labs
         arr_counf.append(gr_arr)
@@ -245,7 +269,7 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
         gr_arr, gr_labs = None, None   
     #--- get MVT
     if params['analysis']['apply_mvt']:
-        mvt_arr, mvt_labs = ucr.extract_mvt(sess_curr['mvtfile'], run_idx0, nvol, 
+        mvt_arr, mvt_labs = ucr.extract_mvt(ptr['mvt_file'], run_idx0, nvol, 
                                                                 verbose=verbose)
         labs_counf = labs_counf + mvt_labs
         arr_counf.append(mvt_arr)
@@ -265,6 +289,7 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     #--- put it together  
     # arr_counf = np.hstack((wm_arr, csf_arr, mvt_arr, bf_arr))
     # labs_counf = wm_labs + csf_labs + mvt_labs + bf_labs
+    some_counfounds = False
     if arr_counf: 
         some_counfounds = True
         arr_counf = np.hstack(tuple(arr_counf))
@@ -272,8 +297,12 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     if verbose:
        #print("wm.shape {}, csf.shape {}, mvt.shape {}, bf.shape {}".format(
        #              wm_arr.shape, csf_arr.shape, mvt_arr.shape, bf_arr.shape))
-       print(arr_counf.shape)
-       print(labs_counf[:17])
+       if some_counfounds:
+           print(arr_counf.shape)
+           print(labs_counf[:17])
+       else: 
+           print('no counfounds')
+
     #run_info['shapes'] = (wm_arr.shape, csf_arr.shape, mvt_arr.shape, bf_arr.shape)
     #run_info['mean_csf'] = csf_arr.mean(axis=0)
     #run_info['mean_mvt'] = mvt_arr.mean(axis=0)
