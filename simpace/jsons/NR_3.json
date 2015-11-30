@@ -1,0 +1,20 @@
+{
+  "smoothed": {
+    "base": "NR_3",
+    "pth": ["subjects", "sessions", "runs"],
+    "hasdirs": false,
+    "pre": "NR_3_sra",
+    "post": "????.nii*",
+    "glb": ["pre", "subjects", "sessions", "runs", "post"]
+  },
+  "signals": {
+    "base": "extracted_signals",
+    "pth": ["subjects", "sessions", "runs"],
+    "hasdirs": false,
+    "optional": true,
+    "pre": "NR_3_signal_",
+    "post": "",
+    "lnk": "_",
+    "glb": ["pre", "subjects", "sessions", "runs"]
+  }
+}

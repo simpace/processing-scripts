@@ -1,0 +1,29 @@
+{
+	"compute_sess_mask": false,
+	"write_sess_mask": false,
+	"apply_sess_mask": true,
+	"min_vox_in_roi": 5,
+	"apply_global_reg": false,
+	"apply_csf": false,
+	"apply_wm": false,
+	"apply_mvt": false,
+	"apply_filter": false,
+	"write_signals": true,
+	"filter": {
+		"low_freq": 0.01,
+		"high_freq": 0.08
+	},
+	"mvt": {
+		"type": "6" 
+	},
+	"csf": {
+		"type": "mean" 
+	},
+	"gr": {
+		"type": "mean" 
+	},
+	"wm": {
+		"type": "mean" 
+	}
+}
+
