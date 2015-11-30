@@ -76,6 +76,8 @@ def _get_key_dict(dlayo, entities = ["subjects", "sessions", "runs"]):
 
 def get_layout(jsonfile, dbase=None, verbose=False):
     """
+    load the jsonfile in a dictionary, change base key value to dbase 
+
     parameters:
     -----------
     dbase:  string
@@ -320,24 +322,27 @@ def _get_aoneof(dlayo, key, dstate, verbose=False):
 def _get_alistof(dlayo, key, dstate={}, return_idxs=False, verbose=False):
     """
     for list of directories (ie subjects, sessions)
+    If the key has no list of directories, eg 'runs', then returns gb.glob(apthglb)
     """
     apth = _get_apth(dlayo, key, dstate,  verbose=verbose)
     apthglb = _get_apthglb(dlayo, key, dstate, glob=False, verbose=verbose)
+    the_glob = gb.glob(apthglb)
 
     if 'hasdirs' in dlayo[key] and (dlayo[key]['hasdirs'] is True):
         # !!! TODO : here we should not check hasdirs, but if there are several values
         apth_kv = osp.join(apth, dlayo[key]['key'] + dlayo[key]['val'])
-        lglb = len(gb.glob(apthglb))
+        lglb = len(the_glob)
         vals = range(1, lglb+1)  # TODO : make it more general, this is only 
-                                # if the values are integers
+                                # if the values are integers and start at 1 !
+        list_of = [apth_kv.format(**{dlayo[key]['key']:val}) for val in vals]
         if return_idxs:
-            return vals, [apth_kv.format(**{dlayo[key]['key']:val}) for val in vals]
+            return vals, list_of 
         else:
-            return [apth_kv.format(**{dlayo[key]['key']:val}) for val in vals]
+            return list_of 
 
     else: 
         assert return_idxs == False # cannot return idxs if not a list of dirs
-        return gb.glob(apthglb)
+        return the_glob 
         # raise ValueError("{} has not multiple dirs".format(key))
 
 def _get_aunique(dlayo, key, dstate={}, check_exists=True):

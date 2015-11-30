@@ -149,11 +149,16 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
     #- Get runs' filenames and sort them 
     #-------------------------------------
     runs = [] 
-    vals = range(1,nb_runs+1)
-    for idx_run in vals:
+    run_indices = range(1,nb_runs+1)
+    for idx_run in run_indices:
         ds = dstate.copy()
         ds.update({dkeys["runs"]:idx_run})
         runs.append(sorted(lo._get_alistof(dlayo, "smoothed", ds)))
+
+    for a_run in runs:
+        if not a_run:
+            print("check what is in {}.".format(lo._get_apth(dlayo, "smoothed", ds)))
+            raise ValueError("runs are empty: {}".format(runs))
 
     ptr['runs'] = runs
 
@@ -163,10 +168,13 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
 
     # compute_epi_mask(runs[0], opening=1, connected=True)
     #-----------------------------------------------------
-    sess_mask = msk.compute_multi_epi_mask(runs, lower_cutoff=0.2, 
-                    upper_cutoff=0.85, connected=True, opening=2, threshold=0.5)
-    suf.rm_and_create(ptr['mask_dir'])
-    if params['analysis']['apply_sess_mask']: sess_mask.to_filename(ptr['mask_file'])
+    if params['analysis']['compute_sess_mask']:
+        sess_mask = msk.compute_multi_epi_mask(runs, lower_cutoff=0.2, 
+                    upper_cutoff=0.85, connected=True, opening=3, threshold=0.5)
+        if params['analysis']['write_sess_mask']: 
+            suf.rm_and_create(ptr['mask_dir'])
+            sess_mask.to_filename(ptr['mask_file'])
+
     # TODO: check mask is reasonable - how ???
 
     # create the directory to write the extracted signals in
@@ -209,8 +217,11 @@ def do_one_run(ptr,  dstate, dkeys, params, verbose=False):  # run_curr, sess_cu
 
     # sess_idx = dstate[dkeys["sessions"]] # sess_curr['sess_idx']
     mvt_cond = ptr['motion'] # run_curr['motion']
-    dsig = ptr['signals_dir'] # sess_curr['dsig']
-    mask = ptr['mask_file'] # sess_curr['mask']
+    # dsig = ptr['signals_dir'] # sess_curr['dsig']
+    if params['analysis']['apply_sess_mask']:
+        mask = ptr['mask_file'] # sess_curr['mask']
+    else:
+        mask = None
 
     low_freq = params['analysis']['filter']['low_freq']
     high_freq = params['analysis']['filter']['high_freq']
@@ -299,7 +310,7 @@ def do_one_run(ptr,  dstate, dkeys, params, verbose=False):  # run_curr, sess_cu
        #              wm_arr.shape, csf_arr.shape, mvt_arr.shape, bf_arr.shape))
        if some_counfounds:
            print(arr_counf.shape)
-           print(labs_counf[:17])
+           print(labs_counf[:np.min([17,arr_counf.shape[1]])])
        else: 
            print('no counfounds')
 
@@ -322,6 +333,7 @@ def do_one_run(ptr,  dstate, dkeys, params, verbose=False):  # run_curr, sess_cu
     # save filtered signals 
     save_is_true = params['analysis']['write_signals']
     if save_is_true:
+        print("\saving {}".format(fn_sig))
         np.savez(fn_sig, arr_sig=arr_sig, labels_sig=labels_sig, 
                          issues=_issues, info=_info, arr_sig_f=arr_sig_f,
                          arr_counf=arr_counf, labs_counf=labs_counf, params=params) 

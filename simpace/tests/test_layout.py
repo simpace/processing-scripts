@@ -75,22 +75,26 @@ def test_get_glb_globFalse():
 
     fil, fdict = lo._get_glb(dlayo, 'subjects', glob=glob, verbose=verbose)
     expected_fil =  'sub*' 
-    assert fil == expected_fil
+    print("fil, expected_fil, fdict", fil, expected_fil, fdict)
+    assert_true(fil == expected_fil)
     assert fdict == {}
     
     fil, fdict = lo._get_glb(dlayo, 'sessions', glob=glob, verbose=verbose)
     expected_fil =  'sess*' 
-    assert fil == expected_fil
+    print("fil, expected_fil, fdict", fil, expected_fil, fdict)
+    assert_true(fil == expected_fil)
     assert fdict == {}
 
     fil, fdict = lo._get_glb(dlayo, 'smoothed', glob=glob, verbose=verbose)
     expected_fil =  'srasub{sub:02d}_sess{sess:02d}_run{run:02d}-????.nii*' 
-    assert fil == expected_fil
+    print("fil, expected_fil, fdict", fil, expected_fil, fdict)
+    assert_true(fil == expected_fil)
     assert fdict == {u'sess': None, u'run': None, u'sub': None}
 
     fil, fdict = lo._get_glb(dlayo, 'wm_mask', glob=glob)
-    expected_fil =  'wm_func_res.nii' 
-    assert fil == expected_fil
+    expected_fil =  'wm_func_res_final.nii.gz' 
+    print("fil, expected_fil, fdict", fil, expected_fil, fdict)
+    assert_true(fil == expected_fil)
     assert fdict == {} 
 
 def test_get_glb_globTrue():
@@ -112,7 +116,7 @@ def test_get_glb_globTrue():
     assert fdict == None 
 
     fil = lo._get_glb(dlayo, 'wm_mask', glob=glob)
-    expected_fil =  'wm_func_res.nii' 
+    expected_fil =  'wm_func_res_final.nii.gz' 
     assert fil == expected_fil
     assert fdict == None 
 
