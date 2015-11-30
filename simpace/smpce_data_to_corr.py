@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os.path as osp
 import json
 import numpy as np
@@ -5,6 +6,7 @@ import argparse
 #from six import string_types
 from nilearn import masking as msk
 from nilearn._utils import concat_niimgs
+import nibabel as nib
 # from nilearn.image.image import _compute_mean
 import utils._utils as ucr
 import utils.setup_filenames as suf 
@@ -13,6 +15,27 @@ import layout as lo
 DIRLAYOUT = 'directory_layout.json'
 DATAPARAM = 'data_parameters.json'
 ANALPARAM = 'analysis_parameters.json'
+
+def check_affines(run, verbose=False):
+    """
+    """
+    if verbose:
+        print("len of run being checked is {}".format(len(run)))
+    img0 = nib.load(run[0])
+    shape0 = img0.shape
+    aff0 = img0.get_affine()
+    if verbose:
+        print("Aff0:\n {} \n".format(aff0))
+
+    for img_fn in run[1:]:
+        img = nib.load(img_fn)
+
+        if img.shape[:3] != shape0:
+            raise ValueError("imgs not the same shapes: "+ img_fn + ' not as '+run[0])
+        if abs(img.get_affine() - aff0).max() > 1e-9:
+            raise ValueError("imgs not the same affi: "+ img_fn + ' not as '+run[0])
+    return True 
+
 
 def get_params(dbase, verbose=False):
     """
@@ -143,7 +166,7 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
     ptr['gm_glb'] = dlayo['gm_mask']['glb']
     #--------- things that we want the names to create them later 
     ptr['mask_dir'] = lo._get_apth(dlayo, "sess_mask", dstate)
-    ptr['mask_file'] = lo._get_aunique(dlayo, "sess_mask", dstate)    
+    # ptr['mask_file'] = lo._get_aunique(dlayo, "sess_mask", dstate)    
     ptr['mask_glb'] = dlayo['sess_mask']['glb']
 
     #- Get runs' filenames and sort them 
@@ -160,6 +183,9 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
             print("check what is in {}.".format(lo._get_apth(dlayo, "smoothed", ds)))
             raise ValueError("runs are empty: {}".format(runs))
 
+    for a_run in runs:
+        check_affines(a_run, verbose=verbose)
+
     ptr['runs'] = runs
 
     # Atlternative:
@@ -168,12 +194,18 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
 
     # compute_epi_mask(runs[0], opening=1, connected=True)
     #-----------------------------------------------------
+    
+
+    
     if params['analysis']['compute_sess_mask']:
         sess_mask = msk.compute_multi_epi_mask(runs, lower_cutoff=0.2, 
                     upper_cutoff=0.85, connected=True, opening=3, threshold=0.5)
         if params['analysis']['write_sess_mask']: 
             suf.rm_and_create(ptr['mask_dir'])
+            ptr['mask_file'] = osp.join(ptr['mask_dir'], ptr['mask_glb'])
             sess_mask.to_filename(ptr['mask_file'])
+            if verbose: print("checking mask affine: \n")
+            check_affines([ptr["mask_file"]] + [r[0] for r in runs], verbose=verbose)
 
     # TODO: check mask is reasonable - how ???
 
@@ -364,9 +396,14 @@ if __name__ == "__main__":
     assert osp.isdir(base_dir), '{} not a directory'.format(base_dir)
 
     info = process_all(base_dir, params=None, verbose=verbose)
-   
-    if verbose:
+
+    tmpfile = osp.join(base_dir, 'tmp.log')
+    with  open(tmpfile, 'w') as file_handle:
         print("\n------------------- Debug info ------------------ \n")
-        print(info)
+        print(info, file=file_handle)
         print("\n------------------- Debug info ------------------ \n")
+
+
+
+
 
