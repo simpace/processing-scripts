@@ -1,4 +1,5 @@
 from __future__ import print_function
+import os
 import os.path as osp
 import json
 import numpy as np
@@ -204,14 +205,13 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
     # compute_epi_mask(runs[0], opening=1, connected=True)
     #-----------------------------------------------------
     
-
-    
+    # the name of the file is always defined ...
+    ptr['mask_file'] = osp.join(ptr['mask_dir'], ptr['mask_glb'])
     if params['analysis']['compute_sess_mask']:
         sess_mask = msk.compute_multi_epi_mask(runs, lower_cutoff=0.2, 
                     upper_cutoff=0.85, connected=True, opening=3, threshold=0.5)
         if params['analysis']['write_sess_mask']: 
             suf.rm_and_create(ptr['mask_dir'])
-            ptr['mask_file'] = osp.join(ptr['mask_dir'], ptr['mask_glb'])
             sess_mask.to_filename(ptr['mask_file'])
             if verbose: print("checking mask affine: \n")
             check_affines([ptr["mask_file"]] + [r[0] for r in runs], verbose=verbose)
@@ -220,8 +220,11 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
 
     # create the directory to write the extracted signals in
     save_is_true = params['analysis']['write_signals']
+    
     if save_is_true: 
-        suf.rm_and_create(ptr['signals_dir'])
+        if not osp.exists(ptr['signals_dir']):
+            os.makedirs(ptr['signals_dir'])
+            if verbose: print('\n making directory {}'.format(ptr['signals_dir']))
 
     # - parameter file for condition names
     conditions = lo._get_aunique(dlayo, "conditions", dstate)

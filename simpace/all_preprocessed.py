@@ -15,30 +15,42 @@ def main(dbase, json_files, run_default=False, verbose=False):
     cwd = dbase 
     if run_default:
         info = stc.process_all("dummy_dbase", default_params, verbose=verbose)
-        ftmp = osp.join(cwd,'tmp_' + osp.join('default','log'))
+        ftmp = osp.join(cwd,'tmp_' + 'default.log')
         with open(ftmp, 'w') as this_file: 
             print(info, file=this_file)
 
     # add what is in the additional json files
     for json_file in json_files: 
+
         # initialize params to default params
         params = default_params
         # add what is in the additional jason file
-        if verbose: print("adding json file {}".format(json_file))
+        print("\n---------------------------------------------"*2)
+        print("adding json file {}".format(json_file))
+        print("\n---------------------------------------------"*2)
+
+        if not osp.isfile(json_file):
+            json_file = osp.join(dbase, osp.basename(json_file)+'.json')
+        if not osp.isfile(json_file):
+            raise ValueError("json file does not exist : {} ".format(json_file))
 
         with open(json_file) as fjson:
             djson = json.load(fjson)
-        for djson_k in djson:
-            params['layout'][djson_k] = djson[djson_k]
-            if verbose: print(djson_k, djson[djson_k])
+
+        #assume things are at the second level only ....
+        for top_key in djson:
+            for second_level in djson[top_key]:
+                params[top_key][second_level] = djson[top_key][second_level]
+                if verbose: print(top_key, second_level, djson[top_key][second_level])
 
         info = stc.process_all("dummy_dbase", params, verbose=verbose)
 
-        ftmp = osp.join(cwd,'tmp_' + osp.join(osp.basename(json_file),'log'))
+        ftmp = osp.join(cwd,'tmp_' + osp.basename(json_file)+'.log')
 
         with open(ftmp, 'w') as this_file: 
             print(info, file=this_file)
 
+    return "\n don't check, everything is good"
 
 #------------------------------------------------------------------------------
 # Running from command line
@@ -51,17 +63,17 @@ if __name__ == "__main__":
     # Positional required arguments
     help_base_dir = "The directory containing sub01/sess??/... and json files: \n" + \
                     "analysis_parameters.json  data_parameters.json  directory_layout.json"
+
     parser.add_argument("base_directory", help=help_base_dir)
 
     # Optional arguments
-
     help_add_json = "an additional json layout file overwritting the one found in the base dir"
 
     parser.add_argument('-a','--add_jsons', nargs='+', help=help_add_json, required=False)
 
-    parser.add_argument("--run_default", help="run default analsysis", action="store_true")
+    parser.add_argument("--run_default", help="run default analsysis", action="store_true", required=False)
     
-    parser.add_argument("--verbose", help="increase output verbosity", action="store_true")
+    parser.add_argument("--verbose", help="increase output verbosity", action="store_true", required=False)
 
     args = parser.parse_args()
     base_dir = args.base_directory
