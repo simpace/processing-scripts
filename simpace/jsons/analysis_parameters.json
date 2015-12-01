@@ -25,7 +25,7 @@
 	"wm": {
 		"type": "mean" 
 	},
-	"subjects": [1],
-	"sessions": [1,2,3]
+	"subjects": [0],
+	"sessions": [0,1,2]
 }
 
