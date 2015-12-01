@@ -5,16 +5,25 @@ import json
 import argparse
 import smpce_data_to_corr as stc
 
-def main(dbase, json_files, verbose=False):
+def main(dbase, json_files, run_default=False, verbose=False):
 
     """
     """
     # read common params
-    params = stc.get_params(dbase, verbose=verbose)
-    cwd = osp.dirname(osp.realpath(__file__))
+    default_params = stc.get_params(dbase, verbose=verbose)
+    #cwd = osp.dirname(osp.realpath(__file__))
+    cwd = dbase 
+    if run_default:
+        info = stc.process_all("dummy_dbase", default_params, verbose=verbose)
+        ftmp = osp.join(cwd,'tmp_' + osp.join('default','log'))
+        with open(ftmp, 'w') as this_file: 
+            print(info, file=this_file)
 
     # add what is in the additional json files
     for json_file in json_files: 
+        # initialize params to default params
+        params = default_params
+        # add what is in the additional jason file
         if verbose: print("adding json file {}".format(json_file))
 
         with open(json_file) as fjson:
@@ -50,17 +59,20 @@ if __name__ == "__main__":
 
     parser.add_argument('-a','--add_jsons', nargs='+', help=help_add_json, required=False)
 
+    parser.add_argument("--run_default", help="run default analsysis", action="store_true")
+    
     parser.add_argument("--verbose", help="increase output verbosity", action="store_true")
 
     args = parser.parse_args()
     base_dir = args.base_directory
     add_jsons = args.add_jsons
+    run_default = args.run_default
     verbose = args.verbose
     
     print("launching analyses on :", base_dir)
     assert osp.isdir(base_dir), '{} not a directory'.format(base_dir)
 
-    info = main(base_dir, add_jsons, verbose=verbose)
+    info = main(base_dir, add_jsons, run_default=run_default, verbose=verbose)
      
     if verbose:
         print("\n------------------- Debug info ------------------ \n")

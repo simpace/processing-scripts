@@ -1,13 +1,13 @@
 {
-	"compute_sess_mask": false,
-	"write_sess_mask": false,
+	"compute_sess_mask": true,
+	"write_sess_mask": true,
 	"apply_sess_mask": true,
 	"min_vox_in_roi": 5,
 	"apply_global_reg": false,
-	"apply_csf": false,
-	"apply_wm": false,
-	"apply_mvt": false,
-	"apply_filter": false,
+	"apply_csf": true,
+	"apply_wm": true,
+	"apply_mvt": true,
+	"apply_filter": true,
 	"write_signals": true,
 	"filter": {
 		"low_freq": 0.01,
@@ -24,6 +24,8 @@
 	},
 	"wm": {
 		"type": "mean" 
-	}
+	},
+	"subjects": [1],
+	"sessions": [1,2,3]
 }
 

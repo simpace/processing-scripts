@@ -84,6 +84,10 @@ def process_all(dbase, params=None, verbose=False):
         dstate[dkeys[k]] = None
    
     idxs, sub_dirs = lo._get_alistof(dlayo, "subjects", dstate, return_idxs=True)
+    # do only those specified in analysis
+    if params['analysis']['subjects']:
+        idxs = params['analysis']['subjects']
+        sub_dirs = [sub_dirs[idx] for idx in idxs]
 
     subjs_info = {}
     for sub_idx, sub_dirs in zip(idxs, sub_dirs): # start idx at 1
@@ -110,6 +114,9 @@ def do_one_subject(dstate, dkeys, params, verbose=False):
     """
     dlayo = params['layout']
     idxs, sess_dirs = lo._get_alistof(dlayo, "sessions", dstate, return_idxs=True)
+    if params['analysis']['sessions']:
+        idxs = params['analysis']['sessions']
+        sess_dirs = [sess_dirs[idx] for idx in idxs]
 
     sesss_info, sess_curr = {}, {}
     for sess_idx, sess_dir in zip(idxs, sess_dirs): 
