@@ -28,13 +28,18 @@ def _get_conditions_patterns():
     return conds_pat
 
 def _get_conditions():
-    conditions = ['none', 'low', 'med', 'high']    
-    return conditions
-
-
+    """
+    return ordered conditions
+    """
+    return ['none', 'low', 'med', 'high']    
+    
+def ordered_conds():
+    return _get_conditions()
 
 def get_signals_filenames(dbase, addjson=None, condpat='', dstate={'sub':1}):
     """
+    TODO : loop over subjects ? not sure as our analyses will be subject per subject
+
     return sorted filenames for addjson (a specific analysis) and condition condpat
     condpat : can be none, NONE, none.npz, or NONE.npz (or any other : low, med, high) 
     """
@@ -57,57 +62,15 @@ def get_signals_filenames(dbase, addjson=None, condpat='', dstate={'sub':1}):
     else: 
         return result_files
 
-def _get_signals_filenames(basedir, params):
+def create_conds_filenames(dbase, addjson=None, dstate={'sub':1}):
     """
-    Parameters:
-    -----------
-    basedir: string
-        The base directory where the data lie
-    params: dict
-        params contains the information about the analysis
-        taken from a jason file.
-
-    returns:
-    --------
-    conds: dict
-        a dictionary with keys the different conditions (eg 'none', 'low', ...)
-        each key contains the npz filenames "signal_run??_`cond`.npz
+    TODO : loop over subjects
     """
-
-    
-    try:
-        layo = params['layout']
-    except:
-        print(basedir, '\n', params)
-        raise ValueError
-
-    nb_sess = params['data']['nb_sess']
-    #nb_sub = params['data']['nb_sub']
-    #nb_run = params['data']['nb_run']
-    druns = layo['dir']['runs']
-    dsig = layo['dir']['signals']
-    
-    conditions = ['none', 'low', 'med', 'high']
     conds = {}
-    conds_pat = ['*NONE.npz', '*LOW.npz', '*MED.npz', '*HIGH.npz']
-    for c in conditions:
-        conds[c] = []
-
-    sessions = range(1,nb_sess+1)
-
-    for sess in sessions:
-        sesstr = 'sess{:02d}'.format(sess)
-        fulldsig = osp.join(basedir, 'sub01', sesstr, druns, dsig)
-        for idx, c in enumerate(conditions):
-            conds[c].append(gb.glob(osp.join(fulldsig, conds_pat[idx]))[0])
-        
-    # some basic checks: all the same length
-    assert not np.any( np.diff(np.asarray([len(conds[c]) for c in conditions])) )
-    
+    for co in _get_conditions():
+        conds[co] = get_signals_filenames(dbase, addjson=addjson, condpat=co, dstate=dstate)
     return conds
 
-def ordered_conds():
-    return ['none', 'low', 'med', 'high']
 
 def _get_common_labels(conds, idx0=0):
     """
@@ -147,7 +110,7 @@ def compute_corr_mtx(conds, common_labels):
         parameters found in the extracted signals 
     """
     conditions_ = conds.keys()
-    conditions  = ordered_conds()
+    conditions  = _get_conditions() # ordered
     assert set(conditions_) == set(conditions)
     
     cond0, sess0 = conditions[0], 0 # cond0 should be "none"
@@ -203,13 +166,14 @@ def save_results(basedir, analysis_label, params, verbose=False):
     params: dict
     """
 
+    return False
     permission = 0o770 # "rwxrws---"
     
-    conds = _get_signals_filenames(basedir, params)
+    conds =  create_conds_filenames(basedir, params)
     common_labels = _get_common_labels(conds)
     conds_arr, stored_params = compute_corr_mtx(conds, common_labels)
 
-    params    = get_params(basedir)
+    params    = smp.get_params(basedir)
     resultdir = params['layout']['res']['dir']
     matrixdir = params['layout']['res']['corr']
     cpsigdir  = params['layout']['res']['sig']
@@ -283,7 +247,7 @@ if __name__ == "__main__":
         nb_run = params['data']['nb_run']
         print("nb_sub: {} nb_sess: {}, nb_run: {}".format(nb_sub, nb_sess, nb_run))
 
-    conds = _get_signals_filenames(base_dir, params)
+    conds = create_conds_filenames(base_dir)
     if verbose: print("conditions in conds: {}".format(conds.keys()))
 
     # some checks
