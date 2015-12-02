@@ -228,10 +228,15 @@ def _get_glb(dlayo, key, glob=False, verbose=False):
                 else:
                     val = dlayo[k]['val']
                 # for the last k, we may not want to put the lnk - it is now here
-                strglb += dlayo[k]['key'] + val + dlayo[k]['lnk']
+                lnk = dlayo[k]['lnk']
+                strglb += dlayo[k]['key'] + val + lnk
                 fdic[dlayo[k]['key']] = None
             else:
                 raise ValueError, "entity: k {} key {} unknown".format(k, key)
+        # remove the last lnk
+        #print('link not removed ', strglb)
+        strglb = strglb.rstrip(lnk)
+        #print('link removed ', strglb, lnk)
 
     if glob: 
         return strglb
