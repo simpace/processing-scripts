@@ -64,12 +64,20 @@ def get_signals_filenames(dbase, addjson=None, condpat='', dstate={'sub':1}):
 
 def create_conds_filenames(dbase, addjson=None, dstate={'sub':1}):
     """
-    TODO : loop over subjects
+    TODO : loop over subjects ?
+    returns:
+    ---------
+    conds: dict
+        conds['none'] is the list of files of the 'none' condition, etc
+    pipeline: string
+        taken from the addjson: will take this name, or "default" if addjson=None
     """
     conds = {}
+    pipeline = 'default'
+    if addjson: pipeline, ext = osp.splitext(addjson)
     for co in _get_conditions():
         conds[co] = get_signals_filenames(dbase, addjson=addjson, condpat=co, dstate=dstate)
-    return conds
+    return conds, pipeline
 
 
 def _get_common_labels(conds, idx0=0):
@@ -79,7 +87,6 @@ def _get_common_labels(conds, idx0=0):
     it is enough to get the regions common across sessions for one condition.
     idx0 provides with the index of that condition. 
     
-
     Parameters:
     -----------
     conds: dict
@@ -100,6 +107,17 @@ def _get_common_labels(conds, idx0=0):
         lsets.append( set((np.load(conds[cond0][sess]))['labels_sig']) )
 
     return set.intersection(*lsets)
+
+def _test_common_labels(conds):
+    """
+    check that all conditions have the same common rois (ie labels)
+    4 conditions
+    """
+    common_labels = _get_common_labels(conds, idx0=0)
+    assert common_labels == _get_common_labels(conds, idx0=1)
+    assert common_labels == _get_common_labels(conds, idx0=2)
+    assert common_labels == _get_common_labels(conds, idx0=3)
+    return True 
 
 def compute_corr_mtx(conds, common_labels):
     """
@@ -153,66 +171,101 @@ def compute_corr_mtx(conds, common_labels):
     return conds_arr, stored_params
 
 
-def save_results(basedir, analysis_label, params, verbose=False):
+# functions that work with the dictionary conds
+#-------------------------------------------------
+def smpce_mean_cond(cond_arr, cond):
+    """ 
+    Estimates the bias of each condition
+    assumes that cond_arr['cond'] is (nb_of_sess, nb_roi, nb_roi)
     """
-    take basedir and analysis label to store the correlation matrix
-    and the parameters in a directory determine by 
-    basedir + params['layout']['res']['dir'] + analysis_label+'_'+timestr
+    # two last dimension must be indentical
+    assert cond_arr[cond].shape[-1] == cond_arr[cond].shape[-2]  
+    return cond_arr[cond].mean(axis=0)
+
     
-    Parameters:
-    -----------
-    basedir: string
-    analysis_label: string
-    params: dict
+def smpce_bias(cond_arr, ordered_conds):
+    """ 
+    Estimates the bias of each condition
+    assumes that cond_arr['cond'] is (nb_of_sess, nb_roi, nb_roi)
     """
-
-    return False
-    permission = 0o770 # "rwxrws---"
     
-    conds =  create_conds_filenames(basedir, params)
-    common_labels = _get_common_labels(conds)
-    conds_arr, stored_params = compute_corr_mtx(conds, common_labels)
-
-    params    = smp.get_params(basedir)
-    resultdir = params['layout']['res']['dir']
-    matrixdir = params['layout']['res']['corr']
-    cpsigdir  = params['layout']['res']['sig']
-    timestr   = time.strftime("%m%d_%H%M%S")
+    assert ordered_conds[0] == 'none'
+    estTrueC = smpce_mean_cond(cond_arr, 'none')
+    bias = {}
+    for ke in ordered_conds:
+        bias[ke] = smpce_mean_cond(cond_arr, ke) - estTrueC
     
-    res_dir   = osp.join(basedir, resultdir)
-    label_dir = osp.join(res_dir, analysis_label+'_'+timestr)
-    matrixdir = osp.join(label_dir, matrixdir)
-    cpsigdir  = osp.join(label_dir, cpsigdir)
+    return bias
 
-    # make directories - will look like results/"analysis_label"_timestr/...
-    if not osp.isdir(res_dir):
-        os.makedirs(res_dir, permission)
-    os.makedirs(label_dir, permission)
-    os.makedirs(matrixdir, permission)
-    os.makedirs(cpsigdir, permission)
-
-    # cp files containing signals to cpsigdir
-    for cond in conds:
-        for fn in conds[cond]:
-            shu.copy(fn, cpsigdir)
-    
-    # save correlation matrices
-    fn_save = osp.join(matrixdir, analysis_label)
-    np.savez(fn_save, conds=conds, common_labels=common_labels, 
-            conds_arr=conds_arr, stored_params=stored_params)
-
-    return fn_save
-
-def _test_common_labels(conds):
+def smpce_var(cond_arr, ordered_conds):
+    """ 
+    Estimates the variance of each condition
+    assumes that cond_arr['cond'] is (nb_of_sess, nb_roi, nb_roi)
     """
-    check that all conditions have the same common rois (ie labels)
-    4 conditions
-    """
-    common_labels = _get_common_labels(conds, idx0=0)
-    assert common_labels == _get_common_labels(conds, idx0=1)
-    assert common_labels == _get_common_labels(conds, idx0=2)
-    assert common_labels == _get_common_labels(conds, idx0=3)
-    return True 
+    
+    assert ordered_conds[0] == 'none'
+    
+    means = {}
+    vari = {}
+    for ke in ordered_conds:
+        means[ke] = smpce_mean_cond(cond_arr, ke)
+    for ke in ordered_conds:
+        Cm = cond_arr[ke]
+        vari[ke] = (Cm**2 - means[ke]).mean(axis=0)
+        
+    return vari
+    
+
+#- def save_results(basedir, analysis_label, params, verbose=False):
+#-     """
+#-     take basedir and analysis label to store the correlation matrix
+#-     and the parameters in a directory determine by 
+#-     basedir + params['layout']['res']['dir'] + analysis_label+'_'+timestr
+#-     
+#-     Parameters:
+#-     -----------
+#-     basedir: string
+#-     analysis_label: string
+#-     params: dict
+#-     """
+#- 
+#-     return False
+#-     permission = 0o770 # "rwxrws---"
+#-     
+#-     conds =  create_conds_filenames(basedir, params)
+#-     common_labels = _get_common_labels(conds)
+#-     conds_arr, stored_params = compute_corr_mtx(conds, common_labels)
+#- 
+#-     params    = smp.get_params(basedir)
+#-     resultdir = params['layout']['res']['dir']
+#-     matrixdir = params['layout']['res']['corr']
+#-     cpsigdir  = params['layout']['res']['sig']
+#-     timestr   = time.strftime("%m%d_%H%M%S")
+#-     
+#-     res_dir   = osp.join(basedir, resultdir)
+#-     label_dir = osp.join(res_dir, analysis_label+'_'+timestr)
+#-     matrixdir = osp.join(label_dir, matrixdir)
+#-     cpsigdir  = osp.join(label_dir, cpsigdir)
+#- 
+#-     # make directories - will look like results/"analysis_label"_timestr/...
+#-     if not osp.isdir(res_dir):
+#-         os.makedirs(res_dir, permission)
+#-     os.makedirs(label_dir, permission)
+#-     os.makedirs(matrixdir, permission)
+#-     os.makedirs(cpsigdir, permission)
+#- 
+#-     # cp files containing signals to cpsigdir
+#-     for cond in conds:
+#-         for fn in conds[cond]:
+#-             shu.copy(fn, cpsigdir)
+#-     
+#-     # save correlation matrices
+#-     fn_save = osp.join(matrixdir, analysis_label)
+#-     np.savez(fn_save, conds=conds, common_labels=common_labels, 
+#-             conds_arr=conds_arr, stored_params=stored_params)
+#- 
+#-     return fn_save
+
 
 
 #-------------------------------------------------------------------------------
