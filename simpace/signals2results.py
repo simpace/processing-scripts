@@ -173,29 +173,62 @@ def compute_corr_mtx(conds, common_labels):
 
 # functions that work with the dictionary conds
 #-------------------------------------------------
-def smpce_mean_cond(cond_arr, cond):
-    """ 
-    Estimates the bias of each condition
-    assumes that cond_arr['cond'] is (nb_of_sess, nb_roi, nb_roi)
-    """
-    # two last dimension must be indentical
-    assert cond_arr[cond].shape[-1] == cond_arr[cond].shape[-2]  
-    return cond_arr[cond].mean(axis=0)
+# def smpce_mean_cond(cond_arr, cond):
+#     """ 
+#     Estimates the bias of each condition
+#     assumes that cond_arr['cond'] is (nb_of_sess, nb_roi, nb_roi)
+#     """
+#     # two last dimension must be indentical
+#     assert cond_arr[cond].shape[-1] == cond_arr[cond].shape[-2]  
+#     return cond_arr[cond].mean(axis=0)
 
     
-def smpce_bias(cond_arr, ordered_conds):
+def smpce_bias(conds_arr, ordered_conds):
     """ 
     Estimates the bias of each condition
     assumes that cond_arr['cond'] is (nb_of_sess, nb_roi, nb_roi)
     """
     
     assert ordered_conds[0] == 'none'
-    estTrueC = smpce_mean_cond(cond_arr, 'none')
+    estTrueC = conds_arr['none'].mean(axis=0)
     bias = {}
     for ke in ordered_conds:
-        bias[ke] = smpce_mean_cond(cond_arr, ke) - estTrueC
+        bias[ke] = conds_arr[ke].mean(axis=0) - estTrueC
     
     return bias
+
+def smpce_bias_std(conds_arr, ordered_conds):
+    """ 
+    Estimates the bias of each condition
+    assumes that cond_arr['cond'] is (nb_of_sess, nb_roi, nb_roi)
+    """
+    
+    assert ordered_conds[0] == 'none'
+    estTrueC = conds_arr['none'].mean(axis=0)
+    bias = {}
+    std = {}
+    for ke in ordered_conds:
+        bias[ke] = conds_arr[ke].mean(axis=0) - estTrueC
+        std[ke] = conds_arr[ke].std(axis=0)
+    
+    return bias, std
+
+def smpce_corr_btw_sess_cond(cond_arr):
+    """
+    return a (nsess,nsess) correlation matrix
+    cond_arr should be (nsess, nroi, nroi) array
+    """
+    nsess = cond_arr.shape[0]
+    nroi = cond_arr.shape[1]
+    iupper = np.triu_indices(nroi,1)
+    #print(len(iupper[0]))
+    upper_corr = np.zeros((nsess, len(iupper[0])))
+    for idx,cor in enumerate(cond_arr):
+        upper_corr[idx] = cor[iupper]
+        #print(cor[iupper].shape)
+
+    return np.corrcoef(upper_corr)
+
 
 def smpce_var(cond_arr, ordered_conds):
     """ 
@@ -208,13 +241,44 @@ def smpce_var(cond_arr, ordered_conds):
     means = {}
     vari = {}
     for ke in ordered_conds:
-        means[ke] = smpce_mean_cond(cond_arr, ke)
-    for ke in ordered_conds:
-        Cm = cond_arr[ke]
-        vari[ke] = (Cm**2 - means[ke]).mean(axis=0)
+        means[ke] = cond_arr[ke].mean(axis=0)
+        vari[ke] = np.sqrt(cond_arr[ke].var(axis=0))
+
+#    for ke in ordered_conds:
+#        means[ke] = smpce_mean_cond(cond_arr, ke)
+#    for ke in ordered_conds:
+#        Cm = cond_arr[ke]
+#        vari[ke] = (Cm**2 - means[ke]).mean(axis=0)
         
     return vari
     
+
+# plotting functions that work with the dictionary conds
+#--------------------------------------------------------
+
+def plot_pipeline_summary(conds_summary, title, pipeline=None, minall=-.4, maxall=.4):
+
+    f, axes = plt.subplots(1, 4, sharey=True, figsize=(16,4))
+    f.subplots_adjust(wspace=0.1)
+    f.subplots_adjust(right=0.85)
+    titlestr = 'Pipeline ' + pipeline + ' - ' + title
+    f.suptitle(titlestr, fontsize=24, fontweight='bold', x=.5, y=.01)
+    left, bottom, width, height = .87, 0.12, 0.02, 0.77 
+    cbar_ax = f.add_axes([left, bottom, width, height])
+
+    minall_ = np.min(np.asarray([conds_summary[k].min() for k in ordered_conds]))
+    maxall_ = np.max(np.asarray([conds_summary[k].max() for k in ordered_conds]))
+    if not minall: minall=minall_
+    if not maxall: maxall=maxall_
+
+    for axe,k in zip(axes,ordered_conds): 
+        m = axe.imshow(conds_summary[k], interpolation='nearest', vmin=minall, vmax=maxall)
+        axe.set_title(k, fontsize=20)
+
+    cm = f.colorbar(m, cax=cbar_ax)
+    return minall_, maxall_
+    
+
 
 #- def save_results(basedir, analysis_label, params, verbose=False):
 #-     """
