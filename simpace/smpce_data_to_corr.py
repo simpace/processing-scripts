@@ -38,7 +38,7 @@ def check_affines(run, verbose=False):
     return True 
 
 
-def get_params(dbase, verbose=False):
+def get_params(dbase, addjson=None, verbose=False):
     """
     Read json files at the base directory dbase
     
@@ -47,6 +47,8 @@ def get_params(dbase, verbose=False):
     dbase:  string
             base directory containing subjects directory
             *and* jason files
+    addjson: string
+            filename of an addtional json file
     """
 
     # Read json files at the base directory
@@ -59,8 +61,22 @@ def get_params(dbase, verbose=False):
         ddata = json.load(fdata)
     with open(fn_anal) as fanal:
         danal = json.load(fanal)
-
     params = {'layout': dlayo, 'data': ddata, 'analysis': danal}
+
+    if addjson:
+        # make sure addjson is a json file 
+        if not osp.isfile(addjson):
+            addjson = osp.join(dbase, osp.basename(addjson)+'.json')
+        if not osp.isfile(addjson):
+            raise ValueError("json file does not exist : {} ".format(addjson))
+        # read and populate params - assume 2 levels
+        with open(addjson) as fjson:
+            djson = json.load(fjson)
+        for top_key in djson:
+            for second_level_key in djson[top_key]:
+                params[top_key][second_level_key] = djson[top_key][second_level_key]
+                if verbose: print(top_key, second_level_key, djson[top_key][second_level_key])
+
     return params
 
 
@@ -161,7 +177,7 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
     #---------
     ptr['mvt_dir'] = lo._get_apth(dlayo, "mvt6params", dstate)
     ptr['mvt_file'] = lo._get_aunique(dlayo, "mvt6params", dstate)
-    ptr['mvt_glb'] = lo._get_glb(dlayo, "mvt6params", glob=True, verbose=False)
+    # ptr['mvt_glb'] = lo._get_glb(dlayo, "mvt6params", glob=True, verbose=False)
     #---------
     ptr['csf_dir'] = lo._get_apth(dlayo, "csf_mask", dstate)
     ptr['csf_file'] = lo._get_aunique(dlayo, "csf_mask", dstate)
