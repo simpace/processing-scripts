@@ -176,6 +176,8 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
         if not a_run:
             helpValueError = "\nPlease check what is in {}".format(
                                         lo._get_apth(dlayo, "smoothed", ds))
+            helpValueError += print(lo._get_alistof(dlayo, "smoothed", ds))
+            helpValueError += print(lo._get_apthglb(dlayo, "smoothed", ds, glbo=False))
             raise ValueError("runs are empty: {}".format(runs) + helpValueError)
 
     for a_run in runs:
