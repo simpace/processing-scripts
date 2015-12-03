@@ -271,7 +271,7 @@ def do_one_run(ptr,  dstate, dkeys, params, verbose=False):  # run_curr, sess_cu
             img4d = nib.load(file_names[0])
             assert img4d.shape[-1] > 1, "img4d.shape = {}".format(img4d.shape)
             should_be_4d = True
-    print("should_be_4d",should_be_4d, file_names)
+    print("should_be_4d",should_be_4d, len(file_names))
     # concat if not already 4d
     if not should_be_4d:
         run_4d = concat_niimgs(file_names, ensure_ndim=4)
