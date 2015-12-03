@@ -155,18 +155,6 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
     ptr['aal_files'] = lo._get_alistof(dlayo, "aal_roi", dstate) #  
     ptr['aal_glb'] = dlayo['aal_roi']['glb']
     #---------
-    ptr['mvt_dir'] = lo._get_apth(dlayo, "mvt6params", dstate)
-    ptr['mvt_file'] = lo._get_aunique(dlayo, "mvt6params", dstate)
-    # ptr['mvt_glb'] = lo._get_glb(dlayo, "mvt6params", glob=True, verbose=False)
-    #---------
-    ptr['csf_dir'] = lo._get_apth(dlayo, "csf_mask", dstate)
-    ptr['csf_file'] = lo._get_aunique(dlayo, "csf_mask", dstate)
-    ptr['csf_glb'] = dlayo['csf_mask']['glb']
-    #---------
-    ptr['wm_dir'] = lo._get_apth(dlayo, "wm_mask", dstate)
-    ptr['wm_file'] = lo._get_aunique(dlayo, "wm_mask", dstate)
-    ptr['wm_glb'] = dlayo['wm_mask']['glb']
-    #---------
     ptr['gm_dir'] = lo._get_apth(dlayo, "gm_mask", dstate)
     ptr['gm_file'] = lo._get_aunique(dlayo, "gm_mask", dstate)
     ptr['gm_glb'] = dlayo['gm_mask']['glb']
@@ -186,22 +174,14 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
 
     for a_run in runs:
         if not a_run:
-            print("check what is in {}.".format(lo._get_apth(dlayo, "smoothed", ds)))
-            raise ValueError("runs are empty: {}".format(runs))
+            helpValueError = "\nPlease check what is in {}".format(
+                                        lo._get_apth(dlayo, "smoothed", ds))
+            raise ValueError("runs are empty: {}".format(runs) + helpValueError)
 
     for a_run in runs:
         ucr.check_affines(a_run, verbose=verbose)
 
-    # if there is only one file per run, check it is a 4d file
-    should_be_4d = False
-    for a_run in runs:
-        if len(a_run) == 1:
-            img4d = nib.load(a_run)
-            assert img4d.shape[-1] > 1, "img4d.shape = {}".format(img4d.shape)
-            should_be_4d = True
-
     ptr['runs'] = runs
-    ptr['should_be_4d'] = should_be_4d
 
     # Atlternative:
     #  runs = [ sorted(lo._get_alistof(dlayo, "smoothed", 
@@ -283,9 +263,20 @@ def do_one_run(ptr,  dstate, dkeys, params, verbose=False):  # run_curr, sess_cu
     #-----------------------------------------------------
     min_vox_roi = params['analysis']['min_vox_in_roi']
 
-    print("ptr['should_be_4d']",ptr['should_be_4d'], file_names)
-    if not ptr['should_be_4d']:
+    # if there is only one file per run, check it is a 4d file
+    should_be_4d = False
+    if len(file_names) == 1:
+            img4d = nib.load(file_names[0])
+            assert img4d.shape[-1] > 1, "img4d.shape = {}".format(img4d.shape)
+            should_be_4d = True
+    print("should_be_4d",should_be_4d, file_names)
+    # concat if not already 4d
+    if not should_be_4d:
         run_4d = concat_niimgs(file_names, ensure_ndim=4)
+    else:
+        run_4d = file_names[0]
+
+    # Extract signals from ROI
     signals, _issues, _info = ucr.extract_signals(ptr['aal_dir'], ptr['aal_glb'],  
                                         run_4d, mask=mask, minvox=min_vox_roi, verbose=verbose)   
     # construct matrix of counfounds
@@ -294,8 +285,11 @@ def do_one_run(ptr,  dstate, dkeys, params, verbose=False):  # run_curr, sess_cu
     labs_counf = []
     #--- get WM 
     if params['analysis']['apply_wm']:
-        wm_arr, wm_labs = ucr.extract_roi_run(
-                            ptr['wm_dir'], ptr['wm_glb'], 
+        wm_dir = lo._get_apth(dlayo, "wm_mask", dstate)
+        #ptr['wm_file'] = lo._get_aunique(dlayo, "wm_mask", dstate)
+        wm_glb = dlayo['wm_mask']['glb']
+        #---------
+        wm_arr, wm_labs = ucr.extract_roi_run( wm_dir, wm_glb, 
                             run_4d, check_lengh=nvol, verbose=verbose)
         labs_counf = labs_counf + wm_labs
         arr_counf.append(wm_arr)
@@ -304,9 +298,12 @@ def do_one_run(ptr,  dstate, dkeys, params, verbose=False):  # run_curr, sess_cu
         wm_arr, wm_labs = None, None   
     #--- get CSF
     if params['analysis']['apply_csf']:
-        csf_arr, csf_labs = ucr.extract_roi_run(
-                            ptr['csf_dir'], ptr['csf_glb'], 
-                            run_4d, check_lengh=nvol, verbose=verbose)
+        csf_dir = lo._get_apth(dlayo, "csf_mask", dstate)
+        #ptr['csf_file'] = lo._get_aunique(dlayo, "csf_mask", dstate)
+        csf_glb = dlayo['csf_mask']['glb']
+        #---------
+        csf_arr, csf_labs = ucr.extract_roi_run(csf_dir, csf_glb, 
+                                run_4d, check_lengh=nvol, verbose=verbose)
         labs_counf = labs_counf + csf_labs
         arr_counf.append(csf_arr)
         if verbose: print("applying csf \n")
@@ -324,7 +321,8 @@ def do_one_run(ptr,  dstate, dkeys, params, verbose=False):  # run_curr, sess_cu
         gr_arr, gr_labs = None, None   
     #--- get MVT
     if params['analysis']['apply_mvt']:
-        mvt_arr, mvt_labs = ucr.extract_mvt(ptr['mvt_file'], run_idx0, nvol, 
+        mvt_file = lo._get_aunique(dlayo, "mvt6params", dstate)
+        mvt_arr, mvt_labs = ucr.extract_mvt(mvt_file, run_idx0, nvol, 
                                                                verbose=verbose)
         labs_counf = labs_counf + mvt_labs
         arr_counf.append(mvt_arr)
@@ -400,6 +398,7 @@ if __name__ == "__main__":
 
     # Optional arguments
     parser.add_argument("--verbose", help="increase output verbosity", action="store_true")
+
     args = parser.parse_args()
     base_dir = args.base_directory
     verbose = args.verbose
