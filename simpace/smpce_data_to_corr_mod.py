@@ -22,7 +22,7 @@ import nibabel as nib
 
 DIRLAYOUT = 'directory_layout.json'
 DATAPARAM = 'data_parameters.json'
-ANALPARAM = 'nuisance_parameters_5.json'
+ANALPARAM = 'nuisance_parameters_6.json'
 
 def get_params(dbase, verbose=False):
     """
