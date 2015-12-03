@@ -63,19 +63,19 @@ if __name__ == "__main__":
     # Positional required arguments
     help_base_dir = "The directory containing sub01/sess??/... and json files: \n" + \
                     "analysis_parameters.json  data_parameters.json  directory_layout.json"
-
     parser.add_argument("base_directory", help=help_base_dir)
 
     # Optional arguments
     help_add_json = "an additional json layout file overwritting the one found in the base dir"
-
     parser.add_argument('-a','--add_jsons', nargs='+', help=help_add_json, required=False)
 
-    parser.add_argument("--run_default", help="run default analsysis", action="store_true", required=False)
+    parser.add_argument("--run_default", help="run default analsysis", action="store_true") #, required=False
     
-    parser.add_argument("--verbose", help="increase output verbosity", action="store_true", required=False)
+    parser.add_argument("--verbose", help="increase output verbosity", action="store_true") # , required=False
 
     args = parser.parse_args()
+    print(args)
+
     base_dir = args.base_directory
     add_jsons = args.add_jsons
     run_default = args.run_default
