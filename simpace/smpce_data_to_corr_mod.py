@@ -22,7 +22,7 @@ import nibabel as nib
 
 DIRLAYOUT = 'directory_layout.json'
 DATAPARAM = 'data_parameters.json'
-ANALPARAM = 'nuisance_parameters_4.json'
+ANALPARAM = 'nuisance_parameters_5.json'
 
 def get_params(dbase, verbose=False):
     """
@@ -134,8 +134,11 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     runs_dir = osp.join(sess_dir, dlayo['dir']['runs']) # should be preproc
     sess_curr['dir_runs'] = runs_dir
 
-    dir_smooth_imgs = osp.join(runs_dir, dlayo['dir']['smooth'])
-    sess_curr['dir_smooth_imgs'] = dir_smooth_imgs
+    if not 'data_prefix' in params['analysis']:
+        dir_smooth_imgs = osp.join(runs_dir, dlayo['dir']['smooth'])
+    else:
+        dir_smooth_imgs = osp.join(runs_dir, params['analysis']['data_prefix']['type'])
+    sess_curr['dir_smooth_imgs'] = dir_smooth_imgs #this is never used
 
     sess_curr['droi'] = osp.join(runs_dir, dlayo['atlas']['dir']) # 'registered_files'
     sess_curr['roi_prefix'] = dlayo['atlas']['prepat']            # 'rraal_*.nii'     
@@ -186,11 +189,14 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     sess_mask = None
     # TODO : separate compute mask and apply
     if params['analysis']['apply_sess_mask']:
-        sess_mask = msk.compute_multi_epi_mask(runs, lower_cutoff=0.2, 
-                    upper_cutoff=0.85, connected=True, opening=2, threshold=0.5)
-        suf.rm_and_create(dir_mask)
-        sess_mask.to_filename(osp.join(sess_curr['mask_dir'], sess_curr['mask_filename']))
-
+        mask_fullfile = osp.join(sess_curr['mask_dir'], sess_curr['mask_filename'])
+        if not osp.isfile(mask_fullfile):
+            sess_mask = msk.compute_multi_epi_mask(runs, lower_cutoff=0.2, 
+                        upper_cutoff=0.85, connected=True, opening=2, threshold=0.5)
+            suf.rm_and_create(dir_mask)
+            sess_mask.to_filename(mask_fullfile)
+        else:
+            sess_mask = nib.load(mask_fullfile) #CORRECT? nib object?
     sess_curr['mask'] = sess_mask
 
     # TODO
@@ -392,32 +398,32 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
         arr_sig_f = arr_sig_f.reshape(img_arr.shape[0], img_arr.shape[1], img_arr.shape[2], Nvols)
 
 
-        if params['analysis']['write_signals']:
+        # if params['analysis']['write_signals']:
 
-            save_prefix = params['analysis']['output_name']['type']
+        save_prefix = params['analysis']['output_name']['type']
 
-            save_dir = os.path.join( sess_curr['dir_runs'], save_prefix )
+        save_dir = os.path.join( sess_curr['dir_runs'], save_prefix )
+        
+        if not os.path.isdir(save_dir):
+            os.mkdir(save_dir)
+
+        np.savetxt(os.path.join(save_dir, save_prefix + '_run_' + str(run_idx) + '.txt'), arr_counf)
+
+        for ivol in range(0,Nvols):
+            data = arr_sig_f[:,:,:,ivol]
+            old_file = file_names[ivol]
+            new_file = os.path.join(save_dir, save_prefix + '_' + os.path.basename(old_file) )
             
-            if not os.path.isdir(save_dir):
-                os.mkdir(save_dir)
+            old_obj = nib.load(old_file)
+            affine = old_obj.get_affine()
+            new_obj = nib.Nifti1Image(data, affine)
+            nib.save(new_obj, new_file)
 
-            np.savetxt(os.path.join(save_dir, save_prefix + '.txt'), arr_counf)
+        affine = run_4d.get_affine()
+        new_img = nib.Nifti1Image(arr_sig_f, affine)
+        new_file = os.path.join(save_dir, save_prefix + '_run_' + str(run_idx) + '.nii.gz' )
 
-            for ivol in range(0,Nvols):
-                data = arr_sig_f[:,:,:,ivol]
-                old_file = file_names[ivol]
-                new_file = os.path.join(save_dir, save_prefix + '_' + os.path.basename(old_file) )
-                
-                old_obj = nib.load(old_file)
-                affine = old_obj.get_affine()
-                new_obj = nib.Nifti1Image(data, affine)
-                nib.save(new_obj, new_file)
-
-            affine = run_4d.get_affine()
-            new_img = nib.Nifti1Image(arr_sig_f, affine)
-            new_file = os.path.join(save_dir, save_prefix + '_run_' + str(run_idx) + '.nii' )
-
-            nib.save(new_img, new_file)
+        nib.save(new_img, new_file)
 
 
 
@@ -444,6 +450,7 @@ if __name__ == "__main__":
     verbose = args.verbose
     
     print("launching analyses on :", base_dir)
+    print("parameters in ", ANALPARAM)
     assert osp.isdir(base_dir), '{} not a directory'.format(base_dir)
 
     info = process_all(base_dir, params=None, verbose=verbose)
