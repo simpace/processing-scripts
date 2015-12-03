@@ -527,8 +527,8 @@ def extract_bf(low_freq, high_freq, volnb, dt, verbose=False):
     order_lf = lf_arr.shape[1]
     order_hf = hf_arr.shape[1]
 
-    assert order_lf > 0 and order_hf > 0, "orders off {}, {}".format(
-                                                        order_lf, order_hf)
+    # assert order_lf > 0 and order_hf > 0, "orders off {}, {}".format(
+    #                                                     order_lf, order_hf)
     lf_labs = ["lf{:003d}".format(idx) for idx in range(order_lf)]
     hf_labs = ["hf{:003d}".format(idx) for idx in range(order_hf)]
 
