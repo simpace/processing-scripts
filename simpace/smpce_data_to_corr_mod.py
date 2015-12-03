@@ -6,7 +6,6 @@ import json
 import numpy as np
 #from six import string_types
 #
-import nilearn
 from nilearn import masking as msk
 from nilearn._utils import concat_niimgs
 # from nilearn.image.image import _compute_mean
@@ -15,9 +14,6 @@ import utils._utils as ucr
 import utils.setup_filenames as suf 
 import argparse
 
-import pdb
-from six import string_types
-import SimpleITK as sitk
 import nibabel as nib
 
 DIRLAYOUT = 'directory_layout.json'
