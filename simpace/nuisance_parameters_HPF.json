@@ -1,0 +1,21 @@
+{
+	"apply_sess_mask": true,
+	"min_vox_in_roi": 5,
+	"apply_global_reg": false,
+	"apply_csf": false,
+	"apply_wm": false,
+	"apply_mvt": false,
+	"apply_filter": true,
+	"write_signals": false,
+	"filter": {
+		"low_freq": 0.01,
+		"high_freq": 0.25
+	},
+	"nuisance_level": {
+		"type": "voxel" 
+	},
+	"output_name": {
+		"type": "HPF" 
+	}
+}
+
