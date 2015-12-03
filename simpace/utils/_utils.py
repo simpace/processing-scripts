@@ -191,6 +191,29 @@ def _cosine_high_freq(period_cut, frametimes, verbose=False):
 #-  This function should be a wrapper over nilearn stuff -#
 #-----------------------------------------------------------------------------#
 
+def check_affines(run, verbose=False):
+    """
+    take a list of filenames and check that affines are the same;
+    should be taken from nilearn
+    """
+    if verbose:
+        print("len of run being checked is {}".format(len(run)))
+    img0 = nib.load(run[0])
+    shape0 = img0.shape
+    aff0 = img0.get_affine()
+    if verbose:
+        print("Aff0:\n {} \n".format(aff0))
+
+    for img_fn in run[1:]:
+        img = nib.load(img_fn)
+
+        if img.shape[:3] != shape0:
+            raise ValueError("imgs not the same shapes: "+ img_fn + ' not as '+run[0])
+        if abs(img.get_affine() - aff0).max() > 1e-9:
+            raise ValueError("imgs not the same affi: "+ img_fn + ' not as '+run[0])
+    return True 
+
+
 def _check_images_compatible(roi_files, nifti_image, imgdim=3):
 
     if isinstance(roi_files, string_types):

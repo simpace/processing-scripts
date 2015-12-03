@@ -17,26 +17,6 @@ DIRLAYOUT = 'directory_layout.json'
 DATAPARAM = 'data_parameters.json'
 ANALPARAM = 'analysis_parameters.json'
 
-def check_affines(run, verbose=False):
-    """
-    """
-    if verbose:
-        print("len of run being checked is {}".format(len(run)))
-    img0 = nib.load(run[0])
-    shape0 = img0.shape
-    aff0 = img0.get_affine()
-    if verbose:
-        print("Aff0:\n {} \n".format(aff0))
-
-    for img_fn in run[1:]:
-        img = nib.load(img_fn)
-
-        if img.shape[:3] != shape0:
-            raise ValueError("imgs not the same shapes: "+ img_fn + ' not as '+run[0])
-        if abs(img.get_affine() - aff0).max() > 1e-9:
-            raise ValueError("imgs not the same affi: "+ img_fn + ' not as '+run[0])
-    return True 
-
 
 def get_params(dbase, addjson=None, verbose=False):
     """
@@ -210,9 +190,18 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
             raise ValueError("runs are empty: {}".format(runs))
 
     for a_run in runs:
-        check_affines(a_run, verbose=verbose)
+        ucr.check_affines(a_run, verbose=verbose)
+
+    # if there is only one file per run, check it is a 4d file
+    should_be_4d = False
+    for a_run in runs:
+        if len(a_run) == 1:
+            img4d = nib.load(a_run)
+            assert img4d.shape[-1] > 1, "img4d.shape = {}".format(img4d.shape)
+            should_be_4d = True
 
     ptr['runs'] = runs
+    ptr['should_be_4d'] = should_be_4d
 
     # Atlternative:
     #  runs = [ sorted(lo._get_alistof(dlayo, "smoothed", 
@@ -221,7 +210,7 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
     # compute_epi_mask(runs[0], opening=1, connected=True)
     #-----------------------------------------------------
     
-    # the name of the file is always defined ...
+    # the name of the file is always defined ... but not necessarily computed or written
     ptr['mask_file'] = osp.join(ptr['mask_dir'], ptr['mask_glb'])
     if params['analysis']['compute_sess_mask']:
         sess_mask = msk.compute_multi_epi_mask(runs, lower_cutoff=0.2, 
@@ -230,7 +219,7 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
             suf.rm_and_create(ptr['mask_dir'])
             sess_mask.to_filename(ptr['mask_file'])
             if verbose: print("checking mask affine: \n")
-            check_affines([ptr["mask_file"]] + [r[0] for r in runs], verbose=verbose)
+            ucr.check_affines([ptr["mask_file"]] + [r[0] for r in runs], verbose=verbose)
 
     # TODO: check mask is reasonable - how ???
 
@@ -255,7 +244,7 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
         # TODO : fix this to have sess_param return motion['run1']='HIGH' etc
         ptr['motion'] = sess_param['motion'][idx_run-1] # sess_param['motion'] is 0 based
 
-        runs_info["run{:02d}".format(idx_run)] = ptr #\
+        runs_info["run{:02d}".format(idx_run)] = ptr # save parameters 
         do_one_run(ptr, dstate, dkeys, params, verbose=verbose)
 
     return runs_info
@@ -277,7 +266,7 @@ def do_one_run(ptr,  dstate, dkeys, params, verbose=False):  # run_curr, sess_cu
 
     # sess_idx = dstate[dkeys["sessions"]] # sess_curr['sess_idx']
     mvt_cond = ptr['motion'] # run_curr['motion']
-    # dsig = ptr['signals_dir'] # sess_curr['dsig']
+
     if params['analysis']['apply_sess_mask']:
         mask = ptr['mask_file'] # sess_curr['mask']
     else:
@@ -288,20 +277,15 @@ def do_one_run(ptr,  dstate, dkeys, params, verbose=False):  # run_curr, sess_cu
     
     # signal file names
     #-------------------
-    #_fn_sig = params['layout']['out']['signals']['signals+'] 
-    ## _fn_fsig = params['layout']['out']['signals']['f_signals+'] 
-    #fn_sig = osp.join(dsig, _fn_sig.format(sess_idx, run_idx) + mvt_cond)
-    ## fn_fsig = osp.join(dsig, _fn_fsig.format(run_idx)+mvt_cond)
-
     fn_sig = lo._get_apthglb(dlayo, "signals", dstate, glob=False) + mvt_cond
-
-    # fn_fsig = lo._get_apthglb(dlayo, "fsignals", dstate, glob=False)
-    # fn_fsig = osp.join(fn_fsig, mvt_cond) 
 
     # extract signals and save them in preproc/roi_signals
     #-----------------------------------------------------
     min_vox_roi = params['analysis']['min_vox_in_roi']
-    run_4d = concat_niimgs(file_names, ensure_ndim=4)
+
+    print("ptr['should_be_4d']",ptr['should_be_4d'], file_names)
+    if not ptr['should_be_4d']:
+        run_4d = concat_niimgs(file_names, ensure_ndim=4)
     signals, _issues, _info = ucr.extract_signals(ptr['aal_dir'], ptr['aal_glb'],  
                                         run_4d, mask=mask, minvox=min_vox_roi, verbose=verbose)   
     # construct matrix of counfounds
@@ -341,7 +325,7 @@ def do_one_run(ptr,  dstate, dkeys, params, verbose=False):  # run_curr, sess_cu
     #--- get MVT
     if params['analysis']['apply_mvt']:
         mvt_arr, mvt_labs = ucr.extract_mvt(ptr['mvt_file'], run_idx0, nvol, 
-                                                                verbose=verbose)
+                                                               verbose=verbose)
         labs_counf = labs_counf + mvt_labs
         arr_counf.append(mvt_arr)
         if verbose: print("applying mvt \n")
@@ -350,7 +334,7 @@ def do_one_run(ptr,  dstate, dkeys, params, verbose=False):  # run_curr, sess_cu
     #--- get cosine functions;
     if params['analysis']['apply_filter']:
         bf_arr, bf_labs = ucr.extract_bf(low_freq, high_freq, nvol, dt, 
-                                                                verbose=verbose)
+                                                               verbose=verbose)
         labs_counf = labs_counf + bf_labs
         arr_counf.append(bf_arr)
         if verbose: print("applying filter \n")
