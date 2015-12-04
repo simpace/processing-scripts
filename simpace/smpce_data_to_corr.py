@@ -1,4 +1,5 @@
 from __future__ import print_function
+import pdb
 import os
 import os.path as osp
 import json
@@ -172,17 +173,14 @@ def do_one_sess(dstate, dkeys, params, verbose=False):
         ds.update({dkeys["runs"]:idx_run})
         runs.append(sorted(lo._get_alistof(dlayo, "smoothed", ds)))
 
-    for a_run in runs:
+    # check runs are not empty
+    for idx, a_run in zip(run_indices, runs):
         if not a_run:
-            helpValueError = "\nPlease check what is in {}  ".format(
-                                        lo._get_apth(dlayo, "smoothed", ds))
-            alistofsmoothed = lo._get_alistof(dlayo, "smoothed", ds)  
-            helpValueError += print(alistofsmoothed, ds, "\n") if alistofsmoothed \
-                                            else 'nothing from a alistofsmoothed'
-            apthglbsmoothed = lo._get_apthglb(dlayo, "smoothed", ds)  
-            helpValueError += print(apthglbsmoothed, ds, "\n") if apthglbsmoothed \
-                                            else 'nothing from a apthglbsmoothed'
-            raise ValueError("runs are empty: {}".format(runs) + helpValueError)
+            ds.update({dkeys["runs"]:idx_run})
+            apth = lo._get_apth(dlayo, "smoothed", ds)
+            apthglb = lo._get_apthglb(dlayo, "smoothed", ds)  
+            helpValueError = "\n-- Please check what is in \n{} \nThe result of apthglb is {} \n".format(apth, apthglb)
+            raise ValueError("run {}  empty: {}".format(idx, a_run) + helpValueError)
 
     for a_run in runs:
         ucr.check_affines(a_run, verbose=verbose)
