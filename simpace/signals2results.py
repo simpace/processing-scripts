@@ -62,7 +62,7 @@ def get_signals_filenames(dbase, addjson=None, condpat='', dstate={'sub':1}):
     else: 
         return result_files
 
-def create_conds_filenames(dbase, addjson=None, dstate={'sub':1}):
+def get_conds_filenames(dbase, addjson=None, dstate={'sub':1}, pipeline_dic={}):
     """
     TODO : loop over subjects ?
     returns:
@@ -73,11 +73,13 @@ def create_conds_filenames(dbase, addjson=None, dstate={'sub':1}):
         taken from the addjson: will take this name, or "default" if addjson=None
     """
     conds = {}
-    pipeline = 'default'
-    if addjson: pipeline, ext = osp.splitext(addjson)
+    pipeline_name = 'default'
+    if addjson: pipeline_name, ext = osp.splitext(addjson)
+    if pipeline_name in pipeline_dic:
+        pipeline_name = pipeline_dic[pipeline_name]
     for co in _get_conditions():
         conds[co] = get_signals_filenames(dbase, addjson=addjson, condpat=co, dstate=dstate)
-    return conds, pipeline
+    return conds, pipeline_name
 
 
 def _get_common_labels(conds, idx0=0):
@@ -183,6 +185,117 @@ def compute_corr_mtx(conds, common_labels):
 #     return cond_arr[cond].mean(axis=0)
 
     
+def fisher_transf(rho):
+    """ take a coefficient of correlation and z transform it 
+        see en.wikipedia.org/wiki/Fisher_transformation
+    """
+    assert rho.max() < 1. and rho.min() > -1. , \
+           "rho.max(), rho.min() {} {}".format(rho.max(), rho.min())    
+    return (0.5 * np.log((1. + rho) / (1. - rho)))
+
+
+def summary_per_corr_mtx(cond_arr, summary=np.mean, fisher_transform=True):
+    """ 
+    input: 
+    -----
+    array of correlations (nsess, nroi, nroi)
+    or (nroi, nroi)
+    output:
+    -------
+    array (nsess,)
+    """
+    
+    if cond_arr.ndim == 2:
+        nsess = 1
+        nroi = cond_arr.shape[0]
+        assert cond_arr.shape[0] == cond_arr.shape[1]
+        cond_arr = cond_arr.reshape((1,nroi,nroi))
+
+    elif cond_arr.ndim == 3:
+        nsess = cond_arr.shape[0]
+        nroi = cond_arr.shape[1]
+        assert cond_arr.shape[1] == cond_arr.shape[2]
+
+    iupper = np.triu_indices(nroi,1)
+
+    cval = np.zeros((nsess,)) 
+    for sess in range(nsess):
+        sess_arr = cond_arr[sess][iupper]
+        if fisher_transform:
+            sess_arr = fisher_transf(sess_arr)
+        cval[sess] = summary(sess_arr)
+
+    return cval
+
+
+def fisher_transf_cond_arr(cond_arr):
+    """
+    cond_arr: array
+        a (nsess, nroi, nroi) array
+    """
+    assert cond_arr.ndim == 3
+    nsess = cond_arr.shape[0]
+    nroi = cond_arr.shape[1]
+    assert cond_arr.shape[1] == cond_arr.shape[2]
+
+    iupper = np.triu_indices(nroi,1)
+    zcond_arr = np.zeros((nsess, len(iupper[0]))) 
+    assert len(iupper[0]) == float(nroi*(nroi-1))/2.
+
+    for sess in range(nsess):
+        sess_arr = cond_arr[sess][iupper]
+        zcond_arr[sess] = fisher_transf(sess_arr)
+
+    return zcond_arr
+
+def conds_2_zconds(conds_arr, ordered_conds):
+    """
+    """
+    zconds_arr = {}
+    for ke in ordered_conds:
+        print(conds_arr[ke].shape)
+        zconds_arr[ke] = fisher_transf_cond_arr(conds_arr[ke])
+        print(ke, zconds_arr[ke].shape)
+    
+    return zconds_arr
+
+def de_bias(zconds_arr, ordered_conds):
+    """ 
+    Estimates the bias of each condition
+    assumes that cond_arr['cond'] is (nb_of_sess, nb_pairs_roi)
+    """
+    
+    assert ordered_conds[0] == 'none'
+    estTrueC = zconds_arr['none'].mean(axis=0)
+    un_biased = {}
+    for ke in ordered_conds:
+        un_biased[ke] = zconds_arr[ke] - estTrueC
+    
+    return un_biased
+
+
+def summary_per_zconds(zconds_arr, summary=np.mean, axis=1, ord_conds=ordered_conds()):
+    """ 
+    input: 
+    -----
+    dict 
+        conds: contains (nsess, npairs) arrays
+    output:
+    -------
+    dict 
+        conds: array (npairs,)
+    """
+    
+    summary_zc = {}
+    for ke in ord_conds:
+        summary_zc[ke] = summary(zconds_arr[ke], axis=axis)
+
+    return summary_zc
+
+
+
+
+
 def smpce_bias(conds_arr, ordered_conds):
     """ 
     Estimates the bias of each condition
@@ -296,7 +409,7 @@ def plot_pipeline_summary(conds_summary, title, pipeline=None, minall=-.4, maxal
 #-     return False
 #-     permission = 0o770 # "rwxrws---"
 #-     
-#-     conds =  create_conds_filenames(basedir, params)
+#-     conds =  get_conds_filenames(basedir, params)
 #-     common_labels = _get_common_labels(conds)
 #-     conds_arr, stored_params = compute_corr_mtx(conds, common_labels)
 #- 
@@ -364,7 +477,7 @@ if __name__ == "__main__":
         nb_run = params['data']['nb_run']
         print("nb_sub: {} nb_sess: {}, nb_run: {}".format(nb_sub, nb_sess, nb_run))
 
-    conds = create_conds_filenames(base_dir)
+    conds = get_conds_filenames(base_dir)
     if verbose: print("conditions in conds: {}".format(conds.keys()))
 
     # some checks
