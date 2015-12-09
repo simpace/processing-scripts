@@ -82,6 +82,59 @@ def get_conds_filenames(dbase, addjson=None, dstate={'sub':1}, pipeline_dic={}):
     return conds, pipeline_name
 
 
+
+
+def test_get_npz_filenames(dbase):
+    params = smp.get_params(dbase, addjson=None)
+    assert params['layout']['signals']['pre'] == 'signal_'
+    assert params['analysis']['compute_sess_mask']
+
+    params = smp.get_params(dbase, addjson='NR_0')
+    assert params['layout']['signals']['pre'] == 'NR_0_signal_'
+    assert not params['analysis']['compute_sess_mask']
+
+    params = smp.get_params(dbase, addjson='NR_1')
+    assert params['layout']['signals']['pre'] == 'NR_1_signal_'
+    assert not params['analysis']['compute_sess_mask']
+
+    # dstate = {'sub':1}
+    pth = lo._get_pth(params['layout'], 'signals', glob=True)
+    assert pth == osp.join(dbase, 'sub*/sess*/preproc/extracted_signals')
+    glb = lo._get_glb(params['layout'], 'signals', glob=True)
+    assert glb == 'NR_1_signal_sub*_sess*_run*'
+
+    return True
+
+def test_get_conds_filenames(dbase, pipelines, nsess=13, ncond=4):
+    """
+    This function checks for each pipeline:
+        1. that the number of files returned per condition is the number of session
+        2. that all these files have different content 
+    """
+
+    def sha1_of_file(filepath):
+        from hashlib import sha1
+        with open(filepath, 'rb') as f:
+            return sha1(f.read()).hexdigest()
+    
+    shas = []
+    npipe = len(pipelines)
+    for pipe in pipelines:
+        # print(pipe, len(shas))
+        conds, pipeline = get_conds_filenames(dbase, addjson=pipe)
+        # print("\n".join(conds['none']))
+        check_nb_files = [np.asarray(conds[cond]).shape[0] for cond in conds]
+        # we should have nsess files per condition
+        assert check_nb_files == [nsess]*ncond
+        
+        for cond in conds:
+            shas.extend([sha1_of_file(fn) for fn in conds[cond]])
+            
+    # print(shas)
+    assert len(set(shas)) == nsess*ncond*npipe, "{} {}".format(len(set(shas)), nsess*ncond*npipe)
+    
+    return True
+
 def _get_common_labels(conds, idx0=0):
     """
     Returns the common labels across sessions 
@@ -232,6 +285,9 @@ def fisher_transf_cond_arr(cond_arr):
     """
     cond_arr: array
         a (nsess, nroi, nroi) array
+    returns:
+    --------
+        a (nsess, npairs) array    
     """
     assert cond_arr.ndim == 3
     nsess = cond_arr.shape[0]
@@ -248,14 +304,14 @@ def fisher_transf_cond_arr(cond_arr):
 
     return zcond_arr
 
-def conds_2_zconds(conds_arr, ordered_conds):
+def conds_2_zconds(conds_arr, ordered_conds, verbose=False):
     """
     """
     zconds_arr = {}
     for ke in ordered_conds:
-        print(conds_arr[ke].shape)
+        if verbose: print("in: ", ke, conds_arr[ke].shape)
         zconds_arr[ke] = fisher_transf_cond_arr(conds_arr[ke])
-        print(ke, zconds_arr[ke].shape)
+        if verbose: print("out: ", ke, zconds_arr[ke].shape)
     
     return zconds_arr
 
@@ -263,6 +319,14 @@ def de_bias(zconds_arr, ordered_conds):
     """ 
     Estimates the bias of each condition
     assumes that cond_arr['cond'] is (nb_of_sess, nb_pairs_roi)
+    input:
+    ------
+    zconds: dict
+        each key 'cond' contains a (nsess, npairs) numpy array
+    returns:
+    --------
+        zconds array with mean (across sessions) of the 'none' 
+        condition removed
     """
     
     assert ordered_conds[0] == 'none'
@@ -274,8 +338,21 @@ def de_bias(zconds_arr, ordered_conds):
     return un_biased
 
 
-def summary_per_zconds(zconds_arr, summary=np.mean, axis=1, ord_conds=ordered_conds()):
+def remove_cond(zconds_arr, ordered_conds, remove='none'):
+    """
+    """
+    minus_remove = {}
+    zremove = zconds_arr[remove] 
+    for ke in ordered_conds:
+        minus_remove[ke] = zconds_arr[ke] - zremove
+
+    return minus_remove
+
+
+
+def summary_per_zconds(zconds_arr, summary=np.mean, verbose=False, ord_conds=ordered_conds()):
     """ 
+    summary across npairs dimension (axis=1)
     input: 
     -----
     dict 
@@ -286,14 +363,33 @@ def summary_per_zconds(zconds_arr, summary=np.mean, axis=1, ord_conds=ordered_co
         conds: array (npairs,)
     """
     
+    if verbose: print(type(zconds_arr))
+    if verbose: print(zconds_arr.keys())
     summary_zc = {}
     for ke in ord_conds:
-        summary_zc[ke] = summary(zconds_arr[ke], axis=axis)
+        if verbose: print(ke, zconds_arr[ke].shape, 'axis:',1)
+        summary_zc[ke] = summary(zconds_arr[ke])
 
     return summary_zc
 
 
+def summary_correlation(zconds_arr, ord_conds=ordered_conds()):
+    """
+    compute the correlation between conditions and none
+    """
+    summary_corr = {}
+    none_cond_values = zconds_arr['none']
+    nsess, npairs = none_cond_values.shape
 
+    for ke in ord_conds:
+        lcorr = []
+        for sess in range(nsess):
+            corr = np.corrcoef(none_cond_values[sess], zconds_arr[ke][sess])
+            lcorr.append(corr[0,1])
+            
+        summary_corr[ke] = np.asarray(lcorr)
+
+    return summary_corr
 
 
 def smpce_bias(conds_arr, ordered_conds):
