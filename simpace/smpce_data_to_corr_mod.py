@@ -15,10 +15,11 @@ import utils.setup_filenames as suf
 import argparse
 
 import nibabel as nib
+import pdb
 
 DIRLAYOUT = 'directory_layout.json'
 DATAPARAM = 'data_parameters.json'
-ANALPARAM = 'nuisance_parameters_6.json'
+ANALPARAM = 'nuisance_parameters_7.json'
 
 def get_params(dbase, verbose=False):
     """
@@ -171,6 +172,12 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
                                         for run_idx in range(1, nb_runs+1)]
                                 # /!\  start idx at 1 requires nb_runs+1  /!\
     runs = [gb.glob(osp.join(dir_smooth_imgs, pat)) for pat in runs_pat]
+
+    if not runs[0]:
+        for irun in range(1, nb_runs+1):
+            runs_pat[irun-1] = '*' + params['analysis']['data_prefix']['type'] + '_run0' + str(irun) + '*.nii*'
+        runs = [gb.glob(osp.join(dir_smooth_imgs, pat)) for pat in runs_pat]
+
     # /!\ATTENTION:/!\ must sort the files with filename, should sort in time
     for run in runs: run.sort()
     sess_curr['runs'] = runs
@@ -261,7 +268,11 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     fn_sig = osp.join(dsig, _fn_sig.format(sess_idx, run_idx) + mvt_cond)
     # fn_fsig = osp.join(dsig, _fn_fsig.format(run_idx)+mvt_cond)
 
-    run_4d = concat_niimgs(file_names, ensure_ndim=4)
+
+    if len(file_names)==1:
+        run_4d = nib.load(file_names[0])
+    else:
+        run_4d = concat_niimgs(file_names, ensure_ndim=4)
 
     # construct matrix of counfounds
     #-----------------------------------------------------
@@ -405,19 +416,20 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
 
         np.savetxt(os.path.join(save_dir, save_prefix + '_run_' + str(run_idx) + '.txt'), arr_counf)
 
-        for ivol in range(0,Nvols):
-            data = arr_sig_f[:,:,:,ivol]
-            old_file = file_names[ivol]
-            new_file = os.path.join(save_dir, save_prefix + '_' + os.path.basename(old_file) )
-            
-            old_obj = nib.load(old_file)
-            affine = old_obj.get_affine()
-            new_obj = nib.Nifti1Image(data, affine)
-            nib.save(new_obj, new_file)
+        if len(file_names)>1:
+            for ivol in range(0,Nvols):
+                data = arr_sig_f[:,:,:,ivol]
+                old_file = file_names[ivol]
+                new_file = os.path.join(save_dir, save_prefix + '_' + os.path.basename(old_file) )
+                
+                old_obj = nib.load(old_file)
+                affine = old_obj.get_affine()
+                new_obj = nib.Nifti1Image(data, affine)
+                nib.save(new_obj, new_file)
 
         affine = run_4d.get_affine()
         new_img = nib.Nifti1Image(arr_sig_f, affine)
-        new_file = os.path.join(save_dir, save_prefix + '_run_' + str(run_idx) + '.nii.gz' )
+        new_file = os.path.join(save_dir, save_prefix + '_run0' + str(run_idx) + '.nii.gz' )
 
         nib.save(new_img, new_file)
 
