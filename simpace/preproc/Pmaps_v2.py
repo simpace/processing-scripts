@@ -1,19 +1,16 @@
 import os, glob, sys
 from os.path import join as pjoin
-import nipype.interfaces.fsl.maths as fslmaths
 import nipype.interfaces.fsl as fsl
 import numpy as np
 import SimpleITK as sitk
 import nibabel as nb
 
-# subject = 'sub' + str(sys.argv[1])
-# session = 'sess' + str(sys.argv[2])
 subject = sys.argv[1]
 session = sys.argv[2]
 if len(sys.argv) > 3:
-	workflow_name = sys.argv[3]
+    workflow_name = sys.argv[3]
 else:
-	workflow_name = 'preproc'
+    workflow_name = 'preproc'
 
 simpace_dir = '/home/despo/simpace'
 data_dir = pjoin(simpace_dir, 'rename_files')
@@ -27,7 +24,7 @@ print 'eroding masks for session: ' + sess_dir
 folder_base = '_in_func_res'
 masks = ['wm', 'csf']
 
-Nvoxels_min = 20 #minimum # of voxels required after mask erosion
+Nvoxels_min = 20  # minimum # of voxels required after mask erosion
 
 probability_thrs = np.arange(.80, .99, .01)
 
@@ -40,43 +37,43 @@ erodeITK.SetForegroundValue(1)
 
 for imask in masks:
 
-	mask_path = pjoin(sess_dir, imask + folder_base)
-	file_path = mask_path + '/' + imask + '*' + file_ext
-	mask_file = glob.glob(file_path)[0]
-	mask_base = os.path.splitext(os.path.basename(mask_file))[0]
+    mask_path = pjoin(sess_dir, imask + folder_base)
+    file_path = mask_path + '/' + imask + '*' + file_ext
+    mask_file = glob.glob(file_path)[0]
+    mask_base = os.path.splitext(os.path.basename(mask_file))[0]
 
-	final_mask_file = mask_path + '/' + mask_base + '_final' + gzip_ext
+    final_mask_file = mask_path + '/' + mask_base + '_final' + gzip_ext
 
-	for ithresh in probability_thrs:
+    for ithresh in probability_thrs:
 
-		new_file_base = mask_path + '/' + mask_base + '_' + str(ithresh)
-		thresh_file = new_file_base + gzip_ext
-		erode_file = new_file_base + '_erode' + gzip_ext
-		
-		imagemaths.inputs.in_file = mask_file
-		imagemaths.inputs.op_string = '-thr ' + str(ithresh) + ' -bin' #Threshold & binarize
-		imagemaths.inputs.out_file = thresh_file
-		imagemaths.run()
+        new_file_base = mask_path + '/' + mask_base + '_' + str(ithresh)
+        thresh_file = new_file_base + gzip_ext
+        erode_file = new_file_base + '_erode' + gzip_ext
 
-		img = sitk.ReadImage(thresh_file)
-		img = sitk.Cast(img, sitk.sitkInt8)
+        imagemaths.inputs.in_file = mask_file
+        imagemaths.inputs.op_string = '-thr ' + str(ithresh) + ' -bin'  # Threshold & binarize
+        imagemaths.inputs.out_file = thresh_file
+        imagemaths.run()
 
-		out = erodeITK.Execute(img)
+        img = sitk.ReadImage(thresh_file)
+        img = sitk.Cast(img, sitk.sitkInt8)
 
-		if imask == 'wm': #erode twice
-			out_again = erodeITK.Execute(out)
-			sitk.WriteImage(out_again,erode_file)
+        out = erodeITK.Execute(img)
 
-		elif imask == 'csf': #erode once
-			sitk.WriteImage(out,erode_file)
-	
-		output_mask = nb.load(erode_file).get_data()
-		total = np.sum(output_mask)
-	
-		if total >= Nvoxels_min:
-			print str(total) + ' voxels in ' + erode_file
+        if imask == 'wm':  # erode twice
+            out_again = erodeITK.Execute(out)
+            sitk.WriteImage(out_again, erode_file)
 
-			if os.path.islink(final_mask_file):
-				os.remove(final_mask_file)
+        elif imask == 'csf':  # erode once
+            sitk.WriteImage(out, erode_file)
 
-			os.symlink( os.path.splitext(os.path.basename(erode_file))[0] + '.gz', final_mask_file)
+        output_mask = nb.load(erode_file).get_data()
+        total = np.sum(output_mask)
+
+        if total >= Nvoxels_min:
+            print str(total) + ' voxels in ' + erode_file
+
+            if os.path.islink(final_mask_file):
+                os.remove(final_mask_file)
+
+            os.symlink(os.path.splitext(os.path.basename(erode_file))[0] + '.gz', final_mask_file)
