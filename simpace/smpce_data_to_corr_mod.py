@@ -4,22 +4,24 @@ import os.path as osp
 import glob as gb
 import json
 import numpy as np
+import math
 #from six import string_types
 #
 from nilearn import masking as msk
 from nilearn._utils import concat_niimgs
 # from nilearn.image.image import _compute_mean
-#
+
 import utils._utils as ucr
 import utils.setup_filenames as suf 
 import argparse
 
 import nibabel as nib
-import pdb
 
 DIRLAYOUT = 'directory_layout.json'
 DATAPARAM = 'data_parameters.json'
-ANALPARAM = 'nuisance_parameters_7.json'
+ANALPARAM = 'analysis_parameters_extract.json'
+# ANALPARAM = 'nuisance_parameters_4.json'
+
 
 def get_params(dbase, verbose=False):
     """
@@ -45,6 +47,7 @@ def get_params(dbase, verbose=False):
 
     params = {'layout': dlayo, 'data': ddata, 'analysis': danal}
     return params
+
 
 def process_all(dbase, params=None, verbose=False):
     """
@@ -77,6 +80,7 @@ def process_all(dbase, params=None, verbose=False):
 
     return subjs_info
 
+
 def do_one_subject(sub_curr, params, verbose=False):
     """
     launch sessions processing for sub_curr 
@@ -106,7 +110,8 @@ def do_one_subject(sub_curr, params, verbose=False):
         sesss_info[sess_str] = do_one_sess(sess_curr, sub_curr, params, verbose=verbose) 
 
     return sesss_info
-    
+
+
 def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     """
     launch runs processing for sess_curr 
@@ -128,25 +133,27 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
 
     dlayo = params['layout']
 
-    runs_dir = osp.join(sess_dir, dlayo['dir']['runs']) # should be preproc
+    runs_dir = osp.join(sess_dir, dlayo['dir']['runs']) # preproc
     sess_curr['dir_runs'] = runs_dir
 
-    if not 'data_prefix' in params['analysis']:
-        dir_smooth_imgs = osp.join(runs_dir, dlayo['dir']['smooth'])
-    else:
-        dir_smooth_imgs = osp.join(runs_dir, params['analysis']['data_prefix']['type'])
+    # specify directory of data to be extracted from - smooth is default as specified in directory_layout.json
+    if 'data_prefix' in params['analysis']:
+        params['layout']['dir']['smooth'] = params['analysis']['data_prefix']['dir']
+
+    dir_smooth_imgs = osp.join(runs_dir, params['layout']['dir']['smooth'])
     sess_curr['dir_smooth_imgs'] = dir_smooth_imgs #this is never used
 
-    sess_curr['droi'] = osp.join(runs_dir, dlayo['atlas']['dir']) # 'registered_files'
-    sess_curr['roi_prefix'] = dlayo['atlas']['prepat']            # 'rraal_*.nii'     
-    sess_curr['dsig'] = osp.join(runs_dir, dlayo['out']['signals']['dir']) 
+    sess_curr['droi'] = osp.join(runs_dir, dlayo['atlas']['dir'])  # e.g. preproc/coreg
+    sess_curr['roi_name'] = dlayo['atlas']['name']  # names of atlas(e)s
+    sess_curr['roi_prefix'] = dlayo['atlas']['prepat']  # '*.nii'
+    sess_curr['dsig'] = osp.join(runs_dir, dlayo['out']['signals']['dir'])  # extracted_signals dir
 
     save_is_true = params['analysis']['write_signals']
-    if save_is_true: 
+    # if save_is_true: 
         # rm existing and recreate signal directory
-        suf.rm_and_create(sess_curr['dsig'])
+        # suf.rm_and_create(sess_curr['dsig'])  #REMOVED!!!!!! not sure why this would be present
 
-    sess_curr['dreal'] = osp.join(runs_dir, dlayo['dir']['realign'])
+    sess_curr['dreal'] = osp.join(runs_dir, dlayo['dir']['realign'])  # used?
 
     #- csf dir and file
     sess_curr['csf_dir'] = osp.join(runs_dir, dlayo['csf']['dir'])
@@ -173,14 +180,16 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
                                 # /!\  start idx at 1 requires nb_runs+1  /!\
     runs = [gb.glob(osp.join(dir_smooth_imgs, pat)) for pat in runs_pat]
 
+    # If specified pattern doesn't exist, used base prefix specified in analysis parameters json file
     if not runs[0]:
         for irun in range(1, nb_runs+1):
-            runs_pat[irun-1] = '*' + params['analysis']['data_prefix']['type'] + '_run0' + str(irun) + '*.nii*'
+            runs_pat[irun-1] = '*' + params['analysis']['data_prefix']['base'] + '*_run0' + str(irun) + '*.nii*'
         runs = [gb.glob(osp.join(dir_smooth_imgs, pat)) for pat in runs_pat]
 
     # /!\ATTENTION:/!\ must sort the files with filename, should sort in time
     for run in runs: run.sort()
     sess_curr['runs'] = runs
+    print runs
     
     # compute session wide mask
     #-----------------------------------------------------
@@ -199,19 +208,23 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
             suf.rm_and_create(dir_mask)
             sess_mask.to_filename(mask_fullfile)
         else:
-            sess_mask = nib.load(mask_fullfile) #CORRECT? nib object?
+            sess_mask = nib.load(mask_fullfile)
+
     sess_curr['mask'] = sess_mask
 
     # TODO
     # check mask is reasonable - how ???
 
-    # - mvt file
-    # example : mvtfile = osp.join(dreal,'rp_asub01_sess01_run01-0006.txt')
-    # /!\ will always be run01 for spm /!\
-    mvtpat = dlayo['spm_mvt']['mvtrun1+'].format(sub_idx, sess_idx) 
-    mvtfile = gb.glob(osp.join(sess_curr['dreal'], mvtpat))
-    mvtfile = suf._check_glob_res(mvtfile, ensure=1, files_only=True)
-    sess_curr['mvtfile'] = mvtfile
+    # # - mvt file
+    # # example : mvtfile = osp.join(dreal,'rp_asub01_sess01_run01-0006.txt')
+    # # /!\ will always be run01 for spm /!\
+    # mvtpat = dlayo['spm_mvt']['mvtrun1+'].format(sub_idx, sess_idx)
+    # mvtfile = gb.glob(osp.join(sess_curr['dreal'], mvtpat))
+    # if not mvtfile:
+    #     sess_curr['mvtfile'] = ''
+    # else:
+    #     mvtfile = suf._check_glob_res(mvtfile, ensure=1, files_only=True)
+    #     sess_curr['mvtfile'] = mvtfile
 
     # - parameter file for condition names
     param_pattern = (dlayo['pat']['sub+sess+']).format(sub_idx, sess_idx)
@@ -233,10 +246,20 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
         # TODO : fix this to have sess_param return motion['run1']='HIGH' etc
         run_curr['motion'] = sess_param['motion'][idx_run-1] # sess_param['motion'] is 0 based
 
+        mvtpat = dlayo['spm_mvt']['mvtrun'].format(sub_idx, sess_idx, run_idx)
+        mvtfile = gb.glob(osp.join(sess_curr['dreal'], mvtpat))
+
+        if not mvtfile:
+            mvtfile = ''
+        else:
+            mvtfile = suf._check_glob_res(mvtfile, ensure=1, files_only=True)
+        run_curr['mvtfile'] = mvtfile
+
         runs_info["run{:02d}".format(idx_run)] = \
                     do_one_run(run_curr, sess_curr, sub_curr, params, verbose=verbose)
 
     return runs_info
+
 
 def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     """
@@ -252,29 +275,22 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     assert run_idx0 >= 0
     assert run_idx0 < nb_run
 
-    #sub_idx = sub_curr['sub_idx']
+    sub_idx = sub_curr['sub_idx']
     sess_idx = sess_curr['sess_idx']
     mvt_cond = run_curr['motion']
+    mvt_file = run_curr['mvtfile']
     dsig = sess_curr['dsig']
     mask = sess_curr['mask']
 
-    low_freq = params['analysis']['filter']['low_freq']
-    high_freq = params['analysis']['filter']['high_freq']
-    
-    # signal file names
-    #-------------------
-    _fn_sig = params['layout']['out']['signals']['signals+'] 
-    # _fn_fsig = params['layout']['out']['signals']['f_signals+'] 
-    fn_sig = osp.join(dsig, _fn_sig.format(sess_idx, run_idx) + mvt_cond)
-    # fn_fsig = osp.join(dsig, _fn_fsig.format(run_idx)+mvt_cond)
+    save_is_true = params['analysis']['write_signals']
 
-
-    if len(file_names)==1:
+    # Load in data depending on 3D / 4D format
+    if len(file_names) == 1:  # only one file per run
         run_4d = nib.load(file_names[0])
     else:
         run_4d = concat_niimgs(file_names, ensure_ndim=4)
 
-    # construct matrix of counfounds
+    # construct matrix of confounds
     #-----------------------------------------------------
     arr_counf = []
     labs_counf = []
@@ -296,7 +312,8 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
         arr_counf.append(wm_arr)
         if verbose: print("applying wm \n")
     else: 
-        wm_arr, wm_labs = None, None   
+        wm_arr, wm_labs = None, None
+
     #--- get CSF
     if params['analysis']['apply_csf']:
         csf_arr, csf_labs = ucr.extract_roi_run(
@@ -309,7 +326,8 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
         if verbose: print("applying csf \n")
     else: 
         csf_arr, csf_labs = None, None   
-    #--- get GR 
+
+    #--- get GR
     if params['analysis']['apply_global_reg']:
         gr_arr, gr_labs = ucr.extract_roi_run(
                             sess_curr['mask_dir'], sess_curr['mask_filename'], 
@@ -319,17 +337,22 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
         if verbose: print("applying GR \n")
     else: 
         gr_arr, gr_labs = None, None   
+
     #--- get MVT
     if params['analysis']['apply_mvt']:
-        mvt_arr, mvt_labs = ucr.extract_mvt(sess_curr['mvtfile'], run_idx0, nvol, 
+        mvt_arr, mvt_labs = ucr.extract_mvt_perrun(mvt_file, nvol,
                                                                 verbose=verbose)
         labs_counf = labs_counf + mvt_labs
         arr_counf.append(mvt_arr)
         if verbose: print("applying mvt \n")
     else: 
         mvt_arr, mvt_labs = None, None
+
     #--- get cosine functions;
     if params['analysis']['apply_filter']:
+        low_freq = float(params['analysis']['filter']['low_freq'])
+        high_freq = float(params['analysis']['filter']['high_freq'])
+
         bf_arr, bf_labs = ucr.extract_bf(low_freq, high_freq, nvol, dt, 
                                                                 verbose=verbose)
         labs_counf = labs_counf + bf_labs
@@ -344,6 +367,9 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     if arr_counf: 
         some_counfounds = True
         arr_counf = np.hstack(tuple(arr_counf))
+    else:
+        some_counfounds = False
+        print 'Not regressing anything out of data!'
     
     if verbose:
        #print("wm.shape {}, csf.shape {}, mvt.shape {}, bf.shape {}".format(
@@ -359,80 +385,100 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     #-----------------------------------------------------
 
     if params['analysis']['nuisance_level']['type'] == 'roi':
-    
+
+        atlas_names = (params['layout']['atlas']['name'])
+
+        _fn_sig = params['layout']['out']['signals']['signals+']
         min_vox_roi = params['analysis']['min_vox_in_roi']
-        signals, _issues, _info = ucr.extract_signals(sess_curr['droi'], 
-                                                      sess_curr['roi_prefix'], run_4d, 
-                                                      mask=mask, minvox=min_vox_roi)   
-        # filter and save 
-        #-----------------------------------------------------
-        arr_sig, labels_sig = ucr._dict_signals_to_arr(signals) 
-        if some_counfounds:
-            arr_sig_f = ucr.R_proj(arr_counf, arr_sig)
-        else:
-            arr_sig_f = arr_sig
 
-        run_info = dict(arr_sig=arr_sig, labels_sig=labels_sig, issues=_issues, 
-                        info=_info, arr_sig_f=arr_sig_f, arr_counf=arr_counf, 
-                        labs_counf=labs_counf)
+        if not osp.isdir(dsig):
+            os.mkdir(dsig)
 
-        # save filtered signals 
-        # save_is_true = params['analysis']['write_signals']
-        # if save_is_true:
-        #     np.savez(fn_sig, arr_sig=arr_sig, labels_sig=labels_sig, 
-        #                      issues=_issues, info=_info, arr_sig_f=arr_sig_f,
-        #                      arr_counf=arr_counf, labs_counf=labs_counf, params=params) 
-            #np.savez(fn_fsig, arr_sig_f=arr_sig_f, arr_counf=arr_counf, labs_counf=labs_counf)
+        for iatlas in atlas_names:
+
+            # signal file names
+            # _fn_fsig = params['layout']['out']['signals']['f_signals+']
+            fn_sig = osp.join(dsig, params['layout']['dir']['smooth'] + "_" \
+                + _fn_sig.format(sub_idx, sess_idx, run_idx) + mvt_cond + "_" + iatlas)
+            # fn_fsig = osp.join(dsig, _fn_fsig.format(run_idx)+mvt_cond)
+
+            print fn_sig
+
+            roi_files = '*' + iatlas + sess_curr['roi_prefix']
+            print roi_files
+            signals, _issues, _info = ucr.extract_signals(sess_curr['droi'],
+                                                          roi_files, run_4d,
+                                                          mask=mask, minvox=min_vox_roi)
+            # filter and save
+            #-----------------------------------------------------
+            arr_sig, labels_sig = ucr._dict_signals_to_arr(signals)
+            if some_counfounds:
+                arr_sig_f = ucr.R_proj(arr_counf, arr_sig)
+            else:
+                arr_sig_f = arr_sig
+
+            run_info = dict(arr_sig=arr_sig, labels_sig=labels_sig, issues=_issues,
+                            info=_info, arr_sig_f=arr_sig_f, arr_counf=arr_counf,
+                            labs_counf=labs_counf)
+
+            # save filtered signals
+            if save_is_true:
+
+                if params['analysis']['apply_filter'] and math.isnan(low_freq) and not math.isnan(high_freq):
+                    fn_sig += "_LFF"
+
+                np.savez(fn_sig, arr_sig=arr_sig, labels_sig=labels_sig,
+                                 issues=_issues, info=_info, arr_sig_f=arr_sig_f,
+                                 arr_counf=arr_counf, labs_counf=labs_counf, params=params)
+                # np.savez(fn_fsig, arr_sig_f=arr_sig_f, arr_counf=arr_counf, labs_counf=labs_counf)
 
         return run_info
-
 
     elif params['analysis']['nuisance_level']['type'] == 'voxel':
         
         img_arr = np.asarray(run_4d.get_data())
         Nvols = img_arr.shape[3]
         Nvoxels = img_arr.size/Nvols
-        img_arr_re = img_arr.reshape(Nvoxels,Nvols)
+        img_arr_re = img_arr.reshape(Nvoxels, Nvols)
         img_arr_re = np.transpose(img_arr_re)
 
         if some_counfounds:
             arr_sig_f = ucr.R_proj(arr_counf, img_arr_re)
         else:
             arr_sig_f = img_arr_re
+            print 'This pipeline does not make sense!'
         
         arr_sig_f = np.transpose(arr_sig_f)
 
         arr_sig_f = arr_sig_f.reshape(img_arr.shape[0], img_arr.shape[1], img_arr.shape[2], Nvols)
 
-
-        # if params['analysis']['write_signals']:
-
         save_prefix = params['analysis']['output_name']['type']
 
-        save_dir = os.path.join( sess_curr['dir_runs'], save_prefix )
+        save_dir = os.path.join(sess_curr['dir_runs'], save_prefix)
         
         if not os.path.isdir(save_dir):
             os.mkdir(save_dir)
 
         np.savetxt(os.path.join(save_dir, save_prefix + '_run_' + str(run_idx) + '.txt'), arr_counf)
 
-        if len(file_names)>1:
-            for ivol in range(0,Nvols):
-                data = arr_sig_f[:,:,:,ivol]
-                old_file = file_names[ivol]
-                new_file = os.path.join(save_dir, save_prefix + '_' + os.path.basename(old_file) )
-                
-                old_obj = nib.load(old_file)
-                affine = old_obj.get_affine()
-                new_obj = nib.Nifti1Image(data, affine)
-                nib.save(new_obj, new_file)
+        ## This was for writing 3-d files
+        # if len(file_names)>1:
+        #     for ivol in range(0,Nvols):
+        #         data = arr_sig_f[:,:,:,ivol]
+        #         old_file = file_names[ivol]
+        #         new_file = os.path.join(save_dir, save_prefix + '_' + os.path.basename(old_file) )
+        #
+        #         old_obj = nib.load(old_file)
+        #         affine = old_obj.get_affine()
+        #         new_obj = nib.Nifti1Image(data, affine)
+        #         nib.save(new_obj, new_file)
 
+        #  write out a 4-d file
         affine = run_4d.get_affine()
         new_img = nib.Nifti1Image(arr_sig_f, affine)
-        new_file = os.path.join(save_dir, save_prefix + '_run0' + str(run_idx) + '.nii.gz' )
+        new_file = os.path.join(save_dir, save_prefix + '_run0' + str(run_idx) + '.nii.gz')
 
         nib.save(new_img, new_file)
-
 
 
     

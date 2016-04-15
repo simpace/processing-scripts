@@ -1,15 +1,15 @@
 {
 	"apply_sess_mask": true,
 	"min_vox_in_roi": 5,
-	"apply_global_reg": true,
+	"apply_global_reg": false,
 	"apply_csf": true,
 	"apply_wm": true,
 	"apply_mvt": true,
 	"apply_filter": true,
-	"write_signals": true,
+	"write_signals": false,
 	"filter": {
 		"low_freq": 0.01,
-		"high_freq": 0.08
+		"high_freq": "NaN"
 	},
 	"mvt": {
 		"type": "6" 
@@ -18,7 +18,7 @@
 		"type": "voxel" 
 	},
 	"output_name": {
-		"type": "NR_1" 
+		"type": "NR_1"
 	},
 	"csf": {
 		"type": "mean" 

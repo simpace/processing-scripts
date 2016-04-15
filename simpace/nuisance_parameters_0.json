@@ -2,32 +2,20 @@
 	"apply_sess_mask": true,
 	"min_vox_in_roi": 5,
 	"apply_global_reg": false,
-	"apply_csf": true,
-	"apply_wm": true,
-	"apply_mvt": true,
+	"apply_csf": false,
+	"apply_wm": false,
+	"apply_mvt": false,
 	"apply_filter": true,
-	"write_signals": true,
+	"write_signals": false,
 	"filter": {
 		"low_freq": 0.01,
-		"high_freq": 0.08
-	},
-	"mvt": {
-		"type": "6" 
+		"high_freq": "NaN"
 	},
 	"nuisance_level": {
 		"type": "voxel" 
 	},
 	"output_name": {
-		"type": "NR_0" 
-	},
-	"csf": {
-		"type": "mean" 
-	},
-	"wm": {
-		"type": "mean" 
-	},
-	"gr": {
-		"type": "mean" 
+		"type": "NR_0"
 	}
 }
 

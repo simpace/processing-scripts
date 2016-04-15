@@ -9,7 +9,7 @@ import json
 from glob import glob
 from os.path import join as pjoin
 import os.path as osp
-import dicom
+# import dicom
 import shutil
 import tempfile
 from six import string_types

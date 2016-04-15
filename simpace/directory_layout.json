@@ -15,13 +15,13 @@
 		"run+": "*run{:02d}-",
 		"sub+sess+": "*sub{:02d}_sess{:02d}_",
 		"sess+run+": "*sess{:02d}_run{:02d}-",
-		"sub+sess+run+": "*sub{:02d}_sess{:02d}_run{:02d}-"
+		"sub+sess+run+": "*sub{:02d}_sess{:02d}_run{:02d}"
 	},
 	"spm_mvt": {
 		"mvtpref": "rp_",
 		"mvtpost": "00?.txt",
 		"mvtprm": "rp_asub??_sess??_run*-00*.txt",
-		"mvtrun1+": "rp_asub{:02d}_sess{:02d}_run01-0*.txt"
+		"mvtrun": "rp_asub{:02d}_sess{:02d}_run{:02d}*.txt"
 	},
 	"csf": {
 		"@dir": "@dir@runs@csf",
@@ -35,12 +35,13 @@
 	},
 	"atlas": {
 		"dir": "coreg",
-		"prepat": "rraal_*.nii"
+		"prepat": "*.nii",
+		"name": ["aal", "power"]
 	},
 	"out": {
 		"signals": {
 			"dir": "extracted_signals",
-			"signals+": "signal_sess{:02d}_run{:02d}_",
+			"signals+": "signal_sub{:02d}_sess{:02d}_run{:02d}",
 			"f_signals+": "filtered_signal_sess_{:02d}_run{:02d}_"
 		},
 		"sess_mask": {

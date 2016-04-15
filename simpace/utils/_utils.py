@@ -7,6 +7,7 @@ import scipy.linalg as lin
 from six import string_types
 import warnings
 from collections import OrderedDict
+import math
 
 # import matplotlib.pyplot as plt
 # import nipy
@@ -460,6 +461,21 @@ def extract_mvt(mvtfile, run_idx, run_len, standardize=True, verbose=False):
 
     return mvt_arr, mvt_labs
 
+def extract_mvt_perrun(mvtfile, run_len, standardize=True, verbose=False):
+    """
+    """
+    mvt = np.loadtxt(mvtfile)
+    assert mvt.ndim == 2, "ndim != 2"
+    assert mvt.shape[1] == 6 ,"mvt.shape[1] != 6" # number of mvt parameters
+    assert (mvt.shape[0] % run_len) == 0, " mvt.shape[0] % run_len != 0 "
+    
+    mvt_labs = ['tx', 'ty', 'tz', 'rx', 'ry', 'rz']
+    # mvt_arr = mvt[run_idx*run_len:(run_idx+1)*run_len,:]
+    if standardize:
+        mvt_arr  = _standardize(mvt, verbose=verbose)
+
+    return mvt_arr, mvt_labs
+
 # - def extract_csf_run(dcsf, csf_filename, run_4d, check_lengh=None,
 # -         standardize=True, verbose=False):
 # - 
@@ -521,9 +537,16 @@ def extract_roi_run(droi, roi_filename, run_4d, check_lengh=None,
 def extract_bf(low_freq, high_freq, volnb, dt, verbose=False):
     #--- get cosine functions; ----------#
 
-    frametimes = np.linspace(0, (volnb-1)*dt, volnb)    
-    lf_arr = _standardize(_cosine_low_freq(1./low_freq, frametimes), verbose=verbose)
-    hf_arr = _standardize(_cosine_high_freq(1./high_freq, frametimes), verbose=verbose)
+    frametimes = np.linspace(0, (volnb-1)*dt, volnb)   
+    if not math.isnan(low_freq):
+        lf_arr = _standardize(_cosine_low_freq(1./low_freq, frametimes), verbose=verbose)
+    else:
+        lf_arr = np.zeros((volnb, 0))
+
+    if not math.isnan(high_freq):
+        hf_arr = _standardize(_cosine_high_freq(1./high_freq, frametimes), verbose=verbose)
+    else:
+        hf_arr = np.zeros((volnb, 0))
     order_lf = lf_arr.shape[1]
     order_hf = hf_arr.shape[1]
 
