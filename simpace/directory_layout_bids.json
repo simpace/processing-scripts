@@ -1,0 +1,58 @@
+{
+	"dir": {
+		"base": "./",
+		"sub+": "sub-{:02d}",
+		"sess+": "ses-{:s}{:02d}",
+		"run+": "acq-{:s}",
+		"runs": "func_proc",
+		"signals": "extracted_signals",
+		"realign": "realign",
+		"smooth": "smooth"
+	},
+	"pat": {
+		"sub+": "*sub-{:02d}_",
+		"sess+": "*ses-{:02d}_",
+		"run+": "acq-",
+		"sub+sess+": "*sub-{:02d}_ses-{:02d}_",
+		"sess+run+": "*sess{:02d}_run{:02d}-",
+		"sub+sess+run+": "*sub-{:02d}_ses-{:s}{:02d}_task-rest_acq-",
+		"postfix": "_bold.nii"
+	},
+	"spm_mvt": {
+		"mvtpref": "rp_",
+		"mvtpost": "00?.txt",
+		"mvtprm": "rp_asub??_sess??_run*-00*.txt",
+		"mvtrun": "rp_asub-{:02d}_ses-{:s}{:02d}_task-rest_acq-{:s}*_bold.txt"
+	},
+	"csf": {
+		"@dir": "@dir@runs@csf",
+		"dir": "csf_in_func_res",
+		"roi_mask": "csf_func_res_final.nii*"
+	},
+	"wm": {
+		"@dir": "@dir@runs@wm",
+		"dir": "wm_in_func_res",
+		"roi_mask": "wm_func_res_final.nii*"
+	},
+	"atlas": {
+		"dir": "coreg",
+		"prepat": "*.nii",
+		"name": ["aal", "power"]
+	},
+	"out": {
+		"signals": {
+			"dir": "extracted_signals",
+			"signals+": "signal_sub-{:02d}_ses-{:s}{:02d}_task-rest_acq-{:s}"
+		},
+		"sess_mask": {
+			"dir": "sess_mask",
+			"roi_mask": "sess_mask.nii"
+		}
+	},
+	"res": {
+		"dir": "results",
+		"sig": "signals",
+		"corr": "corr_mtx"
+	}
+}
+

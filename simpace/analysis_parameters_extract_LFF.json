@@ -1,0 +1,34 @@
+{
+	"apply_sess_mask": true,
+	"min_vox_in_roi": 5,
+	"apply_global_reg": false,
+	"apply_csf": false,
+	"apply_wm": false,
+	"apply_mvt": false,
+	"apply_filter": true,
+	"write_signals": true,
+	"filter": {
+		"low_freq": "NaN",
+		"high_freq": 0.08
+	},
+	"nuisance_level": {
+		"type": "roi" 
+	},
+	"mvt": {
+		"type": "6" 
+	},
+	"csf": {
+		"type": "mean" 
+	},
+	"gr": {
+		"type": "mean" 
+	},
+	"wm": {
+		"type": "mean" 
+	},
+	"data_prefix": {
+		"base": "NR",
+		"dir": "NR_4"
+	}
+}
+

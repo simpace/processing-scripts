@@ -17,13 +17,13 @@ import argparse
 
 import nibabel as nib
 
-DIRLAYOUT = 'directory_layout.json'
+DIRLAYOUT = 'directory_layout_bids.json'
 DATAPARAM = 'data_parameters.json'
-ANALPARAM = 'analysis_parameters_extract.json'
-# ANALPARAM = 'nuisance_parameters_4.json'
+# ANALPARAM = 'nuisance_parameters_0.json'
+# ANALPARAM = 'analysis_parameters_extract.json'
 
 
-def get_params(dbase, verbose=False):
+def get_params(dbase, trajectory, sessions, ANALPARAM, verbose=False):
     """
     parameters:
     -----------
@@ -45,11 +45,17 @@ def get_params(dbase, verbose=False):
     with open(fn_anal) as fanal:
         danal = json.load(fanal)
 
+    if not sessions:
+        ddata['sessions'] = '*'
+    else:
+        ddata['sessions'] = sessions
+    ddata['trajectory'] = trajectory
+
     params = {'layout': dlayo, 'data': ddata, 'analysis': danal}
     return params
 
 
-def process_all(dbase, params=None, verbose=False):
+def process_all(dbase, subject, trajectory, sessions, ANALPARAM, params=None, verbose=False):
     """
     parameters:
     -----------
@@ -58,25 +64,24 @@ def process_all(dbase, params=None, verbose=False):
             and jason files
     """
     if not params:
-        params = get_params(dbase, verbose=verbose)
+        params = get_params(dbase, trajectory, sessions, ANALPARAM, verbose=verbose)
     
     dlayo = params['layout']
     ddata = params['data']
 
-    # loop over subjects
-    subj_idx = range(1,ddata['nb_sub']+1) # starts at 1, hence + 1
-    subj_dirs = [osp.join(dbase, (dlayo['dir']['sub+']).format(idx)) for idx in subj_idx]
-    # check all subj_dirs exists
-    for sub_dir in subj_dirs:
-        assert osp.isdir(sub_dir), "sub_dir"
+    # set up subject (not loop over subjects)
+    # subj_idx = subject  # input to script
+    subj_dir = osp.join(dbase, (dlayo['dir']['sub+']).format(subject))
+    # check subj_dir exists
+    assert osp.isdir(subj_dir), "sub_dir"
 
-    subjs_info = {}
     sub_curr = {}
-    for sub_idx, sub_dir in enumerate(subj_dirs, 1): # start idx at 1
-        sub_curr['sub_idx'] = sub_idx
-        sub_curr['sub_dir'] = sub_dir
-        sub_str = (dlayo['dir']['sub+']).format(sub_idx)
-        subjs_info[sub_str] =  do_one_subject(sub_curr, params, verbose=verbose) 
+    subjs_info = {}
+    sub_curr['sub_idx'] = subject  # input to script
+    sub_curr['sub_dir'] = subj_dir
+    sub_str = (dlayo['dir']['sub+']).format(subject)
+
+    subjs_info[sub_str] =  do_one_subject(sub_curr, params, verbose=verbose)
 
     return subjs_info
 
@@ -95,17 +100,23 @@ def do_one_subject(sub_curr, params, verbose=False):
             
     """
     sub_idx, sub_dir = sub_curr['sub_idx'], sub_curr['sub_dir']
-    nb_sess = params['data']['nb_sess']
+    # nb_sess = params['data']['nb_sess']
     dlayo = params['layout']
-    sess_idx = range(1, nb_sess+1)
-    sess_dirs = [osp.join(sub_dir, (dlayo['dir']['sess+']).format(idx)) for idx in sess_idx]
+    traj = params['data']['trajectory']
+    sess_list = params['data']['sessions']
+    if sess_list is '*':
+        sess_dirs = gb.glob(osp.join(sub_dir, '*' + traj + '*'))
+    else:
+        sess_dirs = [osp.join(sub_dir, (dlayo['dir']['sess+']).format(traj, idx)) for idx in sess_list]
 
     sesss_info = {} 
     sess_curr = {}
     for sess_idx, sess_dir in enumerate(sess_dirs, 1): # start idx at 1
-        sess_curr['sess_idx'] = sess_idx
+        curr_sess = sess_list[sess_idx-1]
+        sess_curr['sess_idx'] = curr_sess
         sess_curr['sess_dir'] = sess_dir
-        sess_str = (dlayo['dir']['sess+']).format(sess_idx)
+        sess_curr['traj'] = traj
+        sess_str = (dlayo['dir']['sess+']).format(traj, curr_sess)
         if verbose: print('\n' + '---'*11  + "\n" + sess_str)
         sesss_info[sess_str] = do_one_sess(sess_curr, sub_curr, params, verbose=verbose) 
 
@@ -127,6 +138,7 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
 
     sess_idx = sess_curr['sess_idx']
     sess_dir = sess_curr['sess_dir']
+    traj = sess_curr['traj']
     sub_idx = sub_curr['sub_idx']
     nb_runs = params['data']['nb_run'] 
     assert nb_runs == 4 # 4debug
@@ -141,7 +153,6 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
         params['layout']['dir']['smooth'] = params['analysis']['data_prefix']['dir']
 
     dir_smooth_imgs = osp.join(runs_dir, params['layout']['dir']['smooth'])
-    sess_curr['dir_smooth_imgs'] = dir_smooth_imgs #this is never used
 
     sess_curr['droi'] = osp.join(runs_dir, dlayo['atlas']['dir'])  # e.g. preproc/coreg
     sess_curr['roi_name'] = dlayo['atlas']['name']  # names of atlas(e)s
@@ -149,9 +160,6 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     sess_curr['dsig'] = osp.join(runs_dir, dlayo['out']['signals']['dir'])  # extracted_signals dir
 
     save_is_true = params['analysis']['write_signals']
-    # if save_is_true: 
-        # rm existing and recreate signal directory
-        # suf.rm_and_create(sess_curr['dsig'])  #REMOVED!!!!!! not sure why this would be present
 
     sess_curr['dreal'] = osp.join(runs_dir, dlayo['dir']['realign'])  # used?
 
@@ -173,21 +181,22 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
 
     #- Get runs' filenames
     #------------------------
-    pat_imgs_files = dlayo['pat']['sub+sess+run+']+"*.nii*"
-                                # requires idx for sub, sess and run
-    runs_pat = [pat_imgs_files.format(sub_idx, sess_idx, run_idx) \
-                                        for run_idx in range(1, nb_runs+1)]
-                                # /!\  start idx at 1 requires nb_runs+1  /!\
-    runs = [gb.glob(osp.join(dir_smooth_imgs, pat)) for pat in runs_pat]
+    pat_files = (dlayo['pat']['sub+sess+run+']).format(sub_idx, traj, sess_idx) + "*.nii*"
+    runs = gb.glob(osp.join(dir_smooth_imgs, pat_files))
+    print runs
+    print dir_smooth_imgs
+    print pat_files
 
     # If specified pattern doesn't exist, used base prefix specified in analysis parameters json file
-    if not runs[0]:
-        for irun in range(1, nb_runs+1):
-            runs_pat[irun-1] = '*' + params['analysis']['data_prefix']['base'] + '*_run0' + str(irun) + '*.nii*'
-        runs = [gb.glob(osp.join(dir_smooth_imgs, pat)) for pat in runs_pat]
+    # *Need to update w/ BIDS formatting to use this functionality
+    if not runs:
+        pat_files = '*' + params['analysis']['data_prefix']['base'] + '*.nii*'
+        runs = gb.glob(osp.join(dir_smooth_imgs, pat_files))
 
-    # /!\ATTENTION:/!\ must sort the files with filename, should sort in time
-    for run in runs: run.sort()
+        # for irun in range(1, nb_runs+1):
+        #     runs_pat[irun-1] = '*' + params['analysis']['data_prefix']['base'] + '*_run0' + str(irun) + '*.nii*'
+
+    # /!\ATTENTION:/!\ sorting not done w/ BIDS formatting, glob default sorts in time
     sess_curr['runs'] = runs
     print runs
     
@@ -198,7 +207,7 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     sess_curr['mask_dir'] = dir_mask
     sess_curr['mask_filename'] = dlayo['out']['sess_mask']['roi_mask']
 
-    sess_mask = None
+    sess_mask = None  # don't think that this does anything
     # TODO : separate compute mask and apply
     if params['analysis']['apply_sess_mask']:
         mask_fullfile = osp.join(sess_curr['mask_dir'], sess_curr['mask_filename'])
@@ -215,38 +224,26 @@ def do_one_sess(sess_curr, sub_curr, params, verbose=False):
     # TODO
     # check mask is reasonable - how ???
 
-    # # - mvt file
-    # # example : mvtfile = osp.join(dreal,'rp_asub01_sess01_run01-0006.txt')
-    # # /!\ will always be run01 for spm /!\
-    # mvtpat = dlayo['spm_mvt']['mvtrun1+'].format(sub_idx, sess_idx)
-    # mvtfile = gb.glob(osp.join(sess_curr['dreal'], mvtpat))
-    # if not mvtfile:
-    #     sess_curr['mvtfile'] = ''
-    # else:
-    #     mvtfile = suf._check_glob_res(mvtfile, ensure=1, files_only=True)
-    #     sess_curr['mvtfile'] = mvtfile
-
-    # - parameter file for condition names
-    param_pattern = (dlayo['pat']['sub+sess+']).format(sub_idx, sess_idx)
-    paramfile = gb.glob(osp.join(sess_dir, param_pattern + "params*"))
-    print sess_dir
-    print param_pattern
-    print osp.join(sess_dir, param_pattern + "params")
-    print paramfile
-    paramfile = suf._check_glob_res(paramfile, ensure=1, files_only=True)
-    with open(paramfile) as fparam:
-         sess_param = json.load(fparam)
-
     runs_info = {}
     run_curr = {}
     for idx_run, run in enumerate(runs, 1): # /!\ starts at 1 /!\
         run_curr['run_idx'] = idx_run
         run_curr['file_names'] = run
+        run_base = os.path.basename(run)
+
+        if 'data_prefix' in params['analysis']:
+            idx_st = run_base.index(params['analysis']['data_prefix']['dir']) + \
+                len(params['analysis']['data_prefix']['dir'])+1
+            idx_end = run_base.index('.nii')
+        else:
+            idx_st = run_base.index(dlayo['pat']['run+']) + len(dlayo['pat']['run+'])
+            idx_end = run_base.index(dlayo['pat']['postfix'])
+
         if verbose: print('\n' + '---'*9  + "\n" + "run{:02d}".format(idx_run))
         # TODO : fix this to have sess_param return motion['run1']='HIGH' etc
-        run_curr['motion'] = sess_param['motion'][idx_run-1] # sess_param['motion'] is 0 based
+        run_curr['motion'] = run_base[idx_st:idx_end]
 
-        mvtpat = dlayo['spm_mvt']['mvtrun'].format(sub_idx, sess_idx, run_idx)
+        mvtpat = dlayo['spm_mvt']['mvtrun'].format(sub_idx, traj, sess_idx, run_curr['motion'])
         mvtfile = gb.glob(osp.join(sess_curr['dreal'], mvtpat))
 
         if not mvtfile:
@@ -269,7 +266,7 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
     dt = params['data']['TR']
     nb_run = params['data']['nb_run']
 
-    file_names = run_curr['file_names']
+    file_name = run_curr['file_names']
     run_idx = run_curr['run_idx']
     run_idx0 = run_idx - 1
     assert run_idx0 >= 0
@@ -277,6 +274,7 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
 
     sub_idx = sub_curr['sub_idx']
     sess_idx = sess_curr['sess_idx']
+    traj = sess_curr['traj']
     mvt_cond = run_curr['motion']
     mvt_file = run_curr['mvtfile']
     dsig = sess_curr['dsig']
@@ -284,11 +282,8 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
 
     save_is_true = params['analysis']['write_signals']
 
-    # Load in data depending on 3D / 4D format
-    if len(file_names) == 1:  # only one file per run
-        run_4d = nib.load(file_names[0])
-    else:
-        run_4d = concat_niimgs(file_names, ensure_ndim=4)
+    # Load in data - assumes 4D format
+    run_4d = nib.load(file_name)
 
     # construct matrix of confounds
     #-----------------------------------------------------
@@ -399,7 +394,7 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
             # signal file names
             # _fn_fsig = params['layout']['out']['signals']['f_signals+']
             fn_sig = osp.join(dsig, params['layout']['dir']['smooth'] + "_" \
-                + _fn_sig.format(sub_idx, sess_idx, run_idx) + mvt_cond + "_" + iatlas)
+                + _fn_sig.format(sub_idx, traj, sess_idx, mvt_cond) + "_" + iatlas)
             # fn_fsig = osp.join(dsig, _fn_fsig.format(run_idx)+mvt_cond)
 
             print fn_sig
@@ -423,9 +418,6 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
 
             # save filtered signals
             if save_is_true:
-
-                if params['analysis']['apply_filter'] and math.isnan(low_freq) and not math.isnan(high_freq):
-                    fn_sig += "_LFF"
 
                 np.savez(fn_sig, arr_sig=arr_sig, labels_sig=labels_sig,
                                  issues=_issues, info=_info, arr_sig_f=arr_sig_f,
@@ -459,24 +451,13 @@ def do_one_run(run_curr, sess_curr, sub_curr, params, verbose=False):
         if not os.path.isdir(save_dir):
             os.mkdir(save_dir)
 
-        np.savetxt(os.path.join(save_dir, save_prefix + '_run_' + str(run_idx) + '.txt'), arr_counf)
-
-        ## This was for writing 3-d files
-        # if len(file_names)>1:
-        #     for ivol in range(0,Nvols):
-        #         data = arr_sig_f[:,:,:,ivol]
-        #         old_file = file_names[ivol]
-        #         new_file = os.path.join(save_dir, save_prefix + '_' + os.path.basename(old_file) )
-        #
-        #         old_obj = nib.load(old_file)
-        #         affine = old_obj.get_affine()
-        #         new_obj = nib.Nifti1Image(data, affine)
-        #         nib.save(new_obj, new_file)
+        save_name = os.path.join(save_dir, save_prefix + '_' + mvt_cond)
+        np.savetxt(save_name + '.txt', arr_counf)
 
         #  write out a 4-d file
         affine = run_4d.get_affine()
         new_img = nib.Nifti1Image(arr_sig_f, affine)
-        new_file = os.path.join(save_dir, save_prefix + '_run0' + str(run_idx) + '.nii.gz')
+        new_file = save_name + '.nii.gz'
 
         nib.save(new_img, new_file)
 
@@ -498,16 +479,26 @@ if __name__ == "__main__":
     parser.add_argument("base_directory", help=help_base_dir)
 
     # Optional arguments
+    parser.add_argument("subject_number")
+    parser.add_argument("trajectory")
+    parser.add_argument("session_number")
+    parser.add_argument("analysis_params")
     parser.add_argument("--verbose", help="increase output verbosity", action="store_true")
     args = parser.parse_args()
     base_dir = args.base_directory
+    subject = int(args.subject_number)
+    session = args.session_number
+    if session is not '*':
+        session = eval(session)
+    trajectory = args.trajectory
+    ANALPARAM = args.analysis_params
     verbose = args.verbose
     
     print("launching analyses on :", base_dir)
     print("parameters in ", ANALPARAM)
     assert osp.isdir(base_dir), '{} not a directory'.format(base_dir)
 
-    info = process_all(base_dir, params=None, verbose=verbose)
+    info = process_all(base_dir, subject, trajectory, session, ANALPARAM, params=None, verbose=verbose)
    
     if verbose:
         print("\n------------------- Debug info ------------------ \n")
